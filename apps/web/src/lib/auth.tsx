@@ -7,7 +7,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: 'learner' | 'instructor' | 'admin' | 'super_admin';
+  role: 'student' | 'instructor' | 'admin' | 'super_admin';
   avatarUrl?: string;
 }
 
@@ -38,7 +38,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await api.getMe();
       if (response.success && response.data) {
-        setUser(response.data);
+        // APIレスポンスをUserインターフェースに変換
+        const userData = response.data;
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          name: userData.profile?.displayName || userData.email,
+          role: userData.role,
+          avatarUrl: userData.profile?.avatarUrl,
+        });
       } else {
         api.setToken(null);
         setUser(null);
