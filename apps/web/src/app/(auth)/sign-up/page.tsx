@@ -81,6 +81,7 @@ export default function SignUpPage() {
               placeholder="山田 太郎"
               value={name}
               onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
               required
               disabled={isLoading}
             />
@@ -96,6 +97,7 @@ export default function SignUpPage() {
               placeholder="example@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
               disabled={isLoading}
             />
@@ -112,6 +114,7 @@ export default function SignUpPage() {
                 placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
                 required
                 disabled={isLoading}
               />
@@ -152,6 +155,7 @@ export default function SignUpPage() {
               placeholder="********"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
               required
               disabled={isLoading}
             />

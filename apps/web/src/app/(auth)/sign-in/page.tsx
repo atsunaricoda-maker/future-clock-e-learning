@@ -19,18 +19,25 @@ export default function SignInPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Login form submitted', { email, password: '***' });
     setError('');
     setIsLoading(true);
 
-    const result = await login(email, password);
-    
-    if (result.success) {
-      router.push('/dashboard');
-    } else {
-      setError(result.error || 'ログインに失敗しました');
+    try {
+      const result = await login(email, password);
+      console.log('Login result:', result);
+      
+      if (result.success) {
+        router.push('/dashboard');
+      } else {
+        setError(result.error || 'ログインに失敗しました');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('ログイン処理中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
@@ -60,6 +67,7 @@ export default function SignInPage() {
               placeholder="example@email.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
               required
               disabled={isLoading}
             />
@@ -84,6 +92,7 @@ export default function SignInPage() {
                 placeholder="********"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 required
                 disabled={isLoading}
               />
