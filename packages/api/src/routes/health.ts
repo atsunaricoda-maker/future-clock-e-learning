@@ -76,3 +76,64 @@ healthRoutes.get('/live', (c) => {
     timestamp: new Date().toISOString(),
   });
 });
+
+// Demo account setup endpoint (temporary - for initial setup)
+healthRoutes.post('/setup-demo', async (c) => {
+  const setupKey = c.req.header('X-Setup-Key');
+  
+  if (setupKey !== 'demo-setup-2024') {
+    return c.json({ success: false, error: 'Invalid setup key' }, 403);
+  }
+
+  try {
+    const now = new Date().toISOString();
+
+    // Update instructor role
+    await c.env.DB.prepare(
+      "UPDATE el_users SET role = 'instructor', updated_at = ? WHERE email = 'instructor@demo.example.com'"
+    ).bind(now).run();
+
+    // Create instructor profile if not exists
+    const instructorUser = await c.env.DB.prepare(
+      "SELECT id FROM el_users WHERE email = 'instructor@demo.example.com'"
+    ).first();
+    
+    if (instructorUser) {
+      const existingProfile = await c.env.DB.prepare(
+        'SELECT id FROM el_instructor_profiles WHERE user_id = ?'
+      ).bind((instructorUser as any).id).first();
+
+      if (!existingProfile) {
+        await c.env.DB.prepare(
+          `INSERT INTO el_instructor_profiles (id, user_id, headline, expertise, commission_rate, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 30, ?, ?)`
+        ).bind(
+          crypto.randomUUID(),
+          (instructorUser as any).id,
+          'シニアソフトウェアエンジニア & 技術講師',
+          '["Python", "JavaScript", "機械学習", "Web開発"]',
+          now,
+          now
+        ).run();
+      }
+    }
+
+    // Update admin role
+    await c.env.DB.prepare(
+      "UPDATE el_users SET role = 'admin', updated_at = ? WHERE email = 'admin@demo.example.com'"
+    ).bind(now).run();
+
+    return c.json({
+      success: true,
+      message: 'Demo accounts configured',
+      accounts: [
+        { email: 'student@demo.example.com', role: 'student' },
+        { email: 'instructor@demo.example.com', role: 'instructor' },
+        { email: 'admin@demo.example.com', role: 'admin' },
+      ]
+    });
+  } catch (error) {
+    console.error('Setup demo error:', error);
+    return c.json({ success: false, error: 'Database error' }, 500);
+  }
+});
