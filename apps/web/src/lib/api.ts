@@ -1094,6 +1094,102 @@ class ApiClient {
       pagination: any;
     }>(`/v1/users/${instructorId}/reviews${query ? `?${query}` : ''}`);
   }
+
+  // Subscriptions
+  async getSubscriptionPlans() {
+    return this.request<{
+      plans: Array<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string;
+        priceMonthly: number;
+        priceYearly: number;
+        currency: string;
+        features: string[];
+        maxCourses: number | null;
+      }>;
+    }>('/v1/subscriptions/plans');
+  }
+
+  async getMySubscription() {
+    return this.request<{
+      subscription: {
+        id: string;
+        planId: string;
+        planName: string;
+        planSlug: string;
+        billingCycle: 'monthly' | 'yearly';
+        status: string;
+        priceMonthly: number;
+        priceYearly: number;
+        features: string[];
+        currentPeriodStart: string;
+        currentPeriodEnd: string;
+        cancelAtPeriodEnd: boolean;
+        canceledAt: string | null;
+        trialEnd: string | null;
+        createdAt: string;
+      } | null;
+    }>('/v1/subscriptions/my-subscription');
+  }
+
+  async subscribe(data: { planId: string; billingCycle: 'monthly' | 'yearly'; successUrl?: string; cancelUrl?: string }) {
+    return this.request<{
+      sessionId?: string;
+      url?: string;
+      subscriptionId?: string;
+      status?: string;
+      message?: string;
+    }>('/v1/subscriptions/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelSubscription() {
+    return this.request<{ message: string }>('/v1/subscriptions/cancel', { method: 'POST' });
+  }
+
+  async resumeSubscription() {
+    return this.request<{ message: string }>('/v1/subscriptions/resume', { method: 'POST' });
+  }
+
+  async changeSubscriptionPlan(data: { newPlanId: string; billingCycle?: 'monthly' | 'yearly' }) {
+    return this.request<{ message: string }>('/v1/subscriptions/change-plan', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getSubscriptionPayments(params?: { page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const query = searchParams.toString();
+    return this.request<{
+      payments: Array<{
+        id: string;
+        planName: string;
+        amount: number;
+        currency: string;
+        status: string;
+        paidAt: string;
+        billingPeriodStart: string;
+        billingPeriodEnd: string;
+      }>;
+      pagination: any;
+    }>(`/v1/subscriptions/payments${query ? `?${query}` : ''}`);
+  }
+
+  async checkSubscriptionAccess() {
+    return this.request<{
+      hasAccess: boolean;
+      plan: string | null;
+      expiresAt?: string;
+    }>('/v1/subscriptions/check-access');
+  }
 }
 
 export const api = new ApiClient(API_URL);

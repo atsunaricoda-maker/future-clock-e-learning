@@ -9,7 +9,8 @@ import {
   Award, 
   Clock, 
   Settings,
-  User 
+  User,
+  CreditCard
 } from 'lucide-react';
 
 const sidebarItems = [
@@ -17,6 +18,7 @@ const sidebarItems = [
   { href: '/dashboard/courses', label: 'マイコース', icon: BookOpen },
   { href: '/dashboard/certificates', label: '修了証', icon: Award },
   { href: '/dashboard/history', label: '学習履歴', icon: Clock },
+  { href: '/dashboard/subscription', label: 'サブスクリプション', icon: CreditCard },
   { href: '/settings', label: '設定', icon: Settings },
   { href: '/profile', label: 'プロフィール', icon: User },
 ];
