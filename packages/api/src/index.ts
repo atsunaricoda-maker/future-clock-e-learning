@@ -15,6 +15,12 @@ import { categoriesRoutes } from './routes/categories';
 import { healthRoutes } from './routes/health';
 import { sectionsRoutes } from './routes/sections';
 import { lecturesRoutes } from './routes/lectures';
+import { progressRoutes } from './routes/progress';
+import { paymentsRoutes } from './routes/payments';
+import { certificatesRoutes } from './routes/certificates';
+import { learningTimeRoutes } from './routes/learning-time';
+import { adminRoutes } from './routes/admin';
+import { videosRoutes } from './routes/videos';
 
 // Create Hono app with typed environment
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -65,6 +71,24 @@ api.route('/categories', categoriesRoutes);
 // Nested routes for course content
 api.route('/courses/:courseId/sections', sectionsRoutes);
 api.route('/courses/:courseId/sections/:sectionId/lectures', lecturesRoutes);
+
+// Progress routes
+api.route('/progress', progressRoutes);
+
+// Payment routes
+api.route('/payments', paymentsRoutes);
+
+// Certificate routes
+api.route('/certificates', certificatesRoutes);
+
+// Learning time routes (助成金対応)
+api.route('/learning-time', learningTimeRoutes);
+
+// Admin routes
+api.route('/admin', adminRoutes);
+
+// Video routes (Cloudflare Stream)
+api.route('/videos', videosRoutes);
 
 // Mount API under /v1
 app.route('/v1', api);

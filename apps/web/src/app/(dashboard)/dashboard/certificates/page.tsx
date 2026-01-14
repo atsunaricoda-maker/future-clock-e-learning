@@ -1,19 +1,33 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { 
   Award, 
   Download, 
   Share2, 
-  Calendar,
   ExternalLink,
-  Loader2
+  Loader2,
+  Clock
 } from 'lucide-react';
+
+interface Certificate {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  thumbnailUrl?: string | null;
+  issuedAt: string;
+  certificateUrl: string;
+}
 
 export default function CertificatesPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
+  const [certificates, setCertificates] = useState<Certificate[]>([]);
+  const [loadingCerts, setLoadingCerts] = useState(true);
+  const [totalWatchTime, setTotalWatchTime] = useState(0);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -24,6 +38,60 @@ export default function CertificatesPage() {
     }
   }, [isLoading, isAuthenticated]);
 
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      fetchCertificates();
+      fetchLearningTime();
+    }
+  }, [isAuthenticated, user]);
+
+  const fetchCertificates = async () => {
+    try {
+      const response = await api.getCertificates();
+      if (response.success && response.data) {
+        setCertificates(response.data.certificates);
+      }
+    } catch (error) {
+      console.error('Failed to fetch certificates:', error);
+    } finally {
+      setLoadingCerts(false);
+    }
+  };
+
+  const fetchLearningTime = async () => {
+    try {
+      const response = await api.getLearningTimeLogs({});
+      if (response.success && response.data) {
+        setTotalWatchTime(response.data.totalDuration);
+      }
+    } catch (error) {
+      console.error('Failed to fetch learning time:', error);
+    }
+  };
+
+  const formatWatchTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return `${hours}時間${minutes > 0 ? `${minutes}分` : ''}`;
+    }
+    return `${minutes}分`;
+  };
+
+  const handleDownload = async (courseId: string) => {
+    try {
+      const response = await api.downloadCertificate(courseId);
+      if (response.success && response.data) {
+        // PDF生成のためのデータを使用してPDFを生成（クライアント側）
+        // 実際の実装では、サーバー側でPDFを生成するか、
+        // クライアント側でjspdfなどのライブラリを使用
+        alert('修了証のダウンロード機能は準備中です');
+      }
+    } catch (error) {
+      console.error('Failed to download certificate:', error);
+    }
+  };
+
   if (isLoading || !user) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -31,25 +99,6 @@ export default function CertificatesPage() {
       </div>
     );
   }
-
-  const certificates = [
-    {
-      id: 'cert-1',
-      courseTitle: 'Excel実践講座',
-      issuedDate: '2026年1月10日',
-      instructor: '鈴木花子',
-      credentialId: 'CERT-2026-001234',
-      duration: '15時間',
-    },
-    {
-      id: 'cert-2',
-      courseTitle: 'プレゼンテーション入門',
-      issuedDate: '2025年12月15日',
-      instructor: '田中一郎',
-      credentialId: 'CERT-2025-009876',
-      duration: '8時間',
-    },
-  ];
 
   return (
     <div className="space-y-6">
@@ -66,7 +115,7 @@ export default function CertificatesPage() {
               <Award className="h-6 w-6 text-yellow-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{certificates.length}</p>
+              <p className="text-2xl font-bold">{loadingCerts ? '-' : certificates.length}</p>
               <p className="text-sm text-muted-foreground">取得済み修了証</p>
             </div>
           </div>
@@ -74,10 +123,10 @@ export default function CertificatesPage() {
         <div className="bg-card border rounded-xl p-6">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Calendar className="h-6 w-6 text-blue-600" />
+              <Clock className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">23時間</p>
+              <p className="text-2xl font-bold">{formatWatchTime(totalWatchTime)}</p>
               <p className="text-sm text-muted-foreground">総学習時間</p>
             </div>
           </div>
@@ -96,64 +145,68 @@ export default function CertificatesPage() {
       </div>
 
       {/* Certificate List */}
-      <div className="space-y-4">
-        {certificates.map((cert) => (
-          <div
-            key={cert.id}
-            className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow"
-          >
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Certificate Preview */}
-              <div className="w-full md:w-64 h-44 bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 rounded-lg flex flex-col items-center justify-center p-4">
-                <Award className="h-12 w-12 text-yellow-600 mb-2" />
-                <p className="text-sm font-semibold text-center text-yellow-800">修了証</p>
-                <p className="text-xs text-yellow-600 text-center mt-1">{cert.courseTitle}</p>
-              </div>
-
-              {/* Certificate Details */}
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold mb-2">{cert.courseTitle}</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-24">発行日</span>
-                    <span>{cert.issuedDate}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-24">講師</span>
-                    <span>{cert.instructor}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-24">学習時間</span>
-                    <span>{cert.duration}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground w-24">認証ID</span>
-                    <code className="text-xs bg-muted px-2 py-1 rounded">{cert.credentialId}</code>
-                  </div>
+      {loadingCerts ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {certificates.map((cert) => (
+            <div
+              key={cert.id}
+              className="bg-card border rounded-xl p-6 hover:shadow-md transition-shadow"
+            >
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Certificate Preview */}
+                <div className="w-full md:w-64 h-44 bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 rounded-lg flex flex-col items-center justify-center p-4">
+                  <Award className="h-12 w-12 text-yellow-600 mb-2" />
+                  <p className="text-sm font-semibold text-center text-yellow-800">修了証</p>
+                  <p className="text-xs text-yellow-600 text-center mt-1 line-clamp-2">{cert.courseTitle}</p>
                 </div>
 
-                {/* Actions */}
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button size="sm" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    PDFダウンロード
-                  </Button>
-                  <Button size="sm" variant="outline" className="gap-2">
-                    <Share2 className="h-4 w-4" />
-                    共有
-                  </Button>
-                  <Button size="sm" variant="outline" className="gap-2">
-                    <ExternalLink className="h-4 w-4" />
-                    検証ページ
-                  </Button>
+                {/* Certificate Details */}
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold mb-2">{cert.courseTitle}</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground w-24">発行日</span>
+                      <span>{new Date(cert.issuedAt).toLocaleDateString('ja-JP', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground w-24">認証ID</span>
+                      <code className="text-xs bg-muted px-2 py-1 rounded">{cert.id}</code>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button size="sm" className="gap-2" onClick={() => handleDownload(cert.courseId)}>
+                      <Download className="h-4 w-4" />
+                      PDFダウンロード
+                    </Button>
+                    <Button size="sm" variant="outline" className="gap-2">
+                      <Share2 className="h-4 w-4" />
+                      共有
+                    </Button>
+                    <Link href={`/courses/${cert.courseId}`}>
+                      <Button size="sm" variant="outline" className="gap-2">
+                        <ExternalLink className="h-4 w-4" />
+                        コースを見る
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {certificates.length === 0 && (
+      {!loadingCerts && certificates.length === 0 && (
         <div className="text-center py-12">
           <Award className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <h3 className="text-lg font-medium mb-2">まだ修了証がありません</h3>
