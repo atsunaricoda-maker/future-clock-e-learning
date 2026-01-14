@@ -134,6 +134,70 @@ app.get('/', (c) => {
   });
 });
 
+// Demo setup endpoint (only for development/demo purposes)
+app.post('/setup-demo-accounts', async (c) => {
+  const setupKey = c.req.header('X-Setup-Key');
+  
+  // Simple protection - require a setup key
+  if (setupKey !== 'demo-setup-2024') {
+    return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'Invalid setup key' } }, 403);
+  }
+
+  try {
+    const now = new Date().toISOString();
+
+    // Update instructor role
+    await c.env.DB.prepare(
+      "UPDATE el_users SET role = 'instructor', updated_at = ? WHERE email = 'instructor@demo.example.com'"
+    ).bind(now).run();
+
+    // Create instructor profile if not exists
+    const instructorUser = await c.env.DB.prepare(
+      "SELECT id FROM el_users WHERE email = 'instructor@demo.example.com'"
+    ).first();
+    
+    if (instructorUser) {
+      const existingInstructorProfile = await c.env.DB.prepare(
+        'SELECT id FROM el_instructor_profiles WHERE user_id = ?'
+      ).bind((instructorUser as any).id).first();
+
+      if (!existingInstructorProfile) {
+        await c.env.DB.prepare(
+          `INSERT INTO el_instructor_profiles (id, user_id, headline, expertise, commission_rate, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 30, ?, ?)`
+        ).bind(
+          crypto.randomUUID(),
+          (instructorUser as any).id,
+          'シニアソフトウェアエンジニア & 技術講師',
+          '["Python", "JavaScript", "機械学習", "Web開発"]',
+          now,
+          now
+        ).run();
+      }
+    }
+
+    // Update admin role
+    await c.env.DB.prepare(
+      "UPDATE el_users SET role = 'admin', updated_at = ? WHERE email = 'admin@demo.example.com'"
+    ).bind(now).run();
+
+    return c.json({
+      success: true,
+      message: 'Demo accounts have been set up successfully',
+      data: {
+        accounts: [
+          { email: 'student@demo.example.com', role: 'student' },
+          { email: 'instructor@demo.example.com', role: 'instructor' },
+          { email: 'admin@demo.example.com', role: 'admin' },
+        ]
+      }
+    });
+  } catch (error) {
+    console.error('Setup demo accounts error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'Failed to setup demo accounts' } }, 500);
+  }
+});
+
 // 404 handler
 app.notFound((c) => {
   return c.json(

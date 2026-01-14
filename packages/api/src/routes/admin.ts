@@ -178,6 +178,61 @@ adminRoutes.put(
   }
 );
 
+// ユーザーロール更新
+const updateRoleSchema = z.object({
+  role: z.enum(['student', 'instructor', 'admin', 'super_admin']),
+});
+
+adminRoutes.put(
+  '/users/:userId/role',
+  requireAdmin,
+  zValidator('json', updateRoleSchema),
+  async (c) => {
+    const { userId } = c.req.param();
+    const { role: newRole } = c.req.valid('json');
+    const currentUserRole = c.get('userRole');
+
+    try {
+      // super_adminロールへの昇格はsuper_adminのみ可能
+      if (newRole === 'super_admin' && currentUserRole !== 'super_admin') {
+        return c.json({ 
+          success: false, 
+          error: { code: 'FORBIDDEN', message: 'super_adminロールの付与はsuper_adminのみ可能です' } 
+        }, 403);
+      }
+
+      const now = new Date().toISOString();
+      
+      await c.env.DB.prepare(
+        'UPDATE el_users SET role = ?, updated_at = ? WHERE id = ?'
+      ).bind(newRole, now, userId).run();
+
+      // インストラクターに昇格した場合、instructor_profileを作成
+      if (newRole === 'instructor') {
+        const existingProfile = await c.env.DB.prepare(
+          'SELECT id FROM el_instructor_profiles WHERE user_id = ?'
+        ).bind(userId).first();
+
+        if (!existingProfile) {
+          await c.env.DB.prepare(
+            `INSERT INTO el_instructor_profiles (id, user_id, commission_rate, created_at, updated_at)
+             VALUES (?, ?, 30, ?, ?)`
+          ).bind(crypto.randomUUID(), userId, now, now).run();
+        }
+      }
+
+      return c.json({
+        success: true,
+        message: 'ユーザーロールを更新しました',
+        data: { userId, role: newRole }
+      });
+    } catch (error) {
+      console.error('Update user role error:', error);
+      return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
+    }
+  }
+);
+
 // コース一覧（管理者用）
 adminRoutes.get('/courses', requireAdmin, async (c) => {
   const page = parseInt(c.req.query('page') || '1');
