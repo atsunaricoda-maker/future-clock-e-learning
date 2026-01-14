@@ -361,6 +361,18 @@ class ApiClient {
     return this.request<{ url: string }>(`/v1/learning-time/export${query ? `?${query}` : ''}`);
   }
 
+  async getWeeklyStudyTime() {
+    return this.request<{
+      weeklyData: Array<{
+        dayOfWeek: string;
+        date: string;
+        totalMinutes: number;
+      }>;
+      thisWeekTotal: number;
+      lastWeekTotal: number;
+    }>('/v1/progress/weekly-study-time');
+  }
+
   // Admin
   async getAdminStats() {
     return this.request<{
@@ -894,6 +906,193 @@ class ApiClient {
 
   async verifyResetToken(token: string) {
     return this.request<{ email: string; expiresAt: string }>(`/v1/email/verify-reset-token?token=${token}`);
+  }
+
+  // Notes
+  async getNotes(params?: { lectureId?: string; courseId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.lectureId) searchParams.set('lectureId', params.lectureId);
+    if (params?.courseId) searchParams.set('courseId', params.courseId);
+
+    const query = searchParams.toString();
+    return this.request<{
+      notes: Array<{
+        id: string;
+        lectureId: string;
+        lectureTitle?: string;
+        sectionTitle?: string;
+        courseTitle?: string;
+        courseId?: string;
+        content: string;
+        timestampSeconds: number | null;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>(`/v1/notes${query ? `?${query}` : ''}`);
+  }
+
+  async createNote(data: { lectureId: string; content: string; timestampSeconds?: number }) {
+    return this.request<{
+      id: string;
+      lectureId: string;
+      content: string;
+      timestampSeconds: number | null;
+      createdAt: string;
+    }>('/v1/notes', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateNote(noteId: string, data: { content: string; timestampSeconds?: number }) {
+    return this.request<{
+      id: string;
+      content: string;
+      timestampSeconds: number | null;
+      updatedAt: string;
+    }>(`/v1/notes/${noteId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteNote(noteId: string) {
+    return this.request<{ deleted: boolean }>(`/v1/notes/${noteId}`, { method: 'DELETE' });
+  }
+
+  // Bookmarks
+  async getBookmarks(params?: { lectureId?: string; courseId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.lectureId) searchParams.set('lectureId', params.lectureId);
+    if (params?.courseId) searchParams.set('courseId', params.courseId);
+
+    const query = searchParams.toString();
+    return this.request<{
+      bookmarks: Array<{
+        id: string;
+        lectureId: string;
+        lectureTitle?: string;
+        sectionTitle?: string;
+        courseTitle?: string;
+        courseId?: string;
+        title: string | null;
+        timestampSeconds: number;
+        createdAt: string;
+      }>;
+    }>(`/v1/notes/bookmarks${query ? `?${query}` : ''}`);
+  }
+
+  async createBookmark(data: { lectureId: string; timestampSeconds: number; title?: string }) {
+    return this.request<{
+      id: string;
+      lectureId: string;
+      title: string | null;
+      timestampSeconds: number;
+      createdAt: string;
+    }>('/v1/notes/bookmarks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBookmark(bookmarkId: string) {
+    return this.request<{ deleted: boolean }>(`/v1/notes/bookmarks/${bookmarkId}`, { method: 'DELETE' });
+  }
+
+  // Instructor Videos
+  async getInstructorVideos() {
+    return this.request<{
+      videos: Array<{
+        id: string;
+        title: string;
+        duration: number;
+        status: 'processing' | 'ready' | 'error';
+        thumbnailUrl?: string;
+        size?: number;
+        createdAt: string;
+        linkedLecture?: {
+          id: string;
+          title: string;
+          courseTitle: string;
+        };
+      }>;
+    }>('/v1/instructor/videos');
+  }
+
+  async deleteVideo(videoId: string) {
+    return this.request<any>(`/v1/videos/${videoId}`, { method: 'DELETE' });
+  }
+
+  // Course Review Submission
+  async submitCourseForReview(courseId: string) {
+    return this.request<{ courseId: string; status: string; submittedAt: string }>(
+      `/v1/courses/${courseId}/publish`,
+      { method: 'POST' }
+    );
+  }
+
+  // Public Instructor Profile
+  async getInstructorProfile(instructorId: string) {
+    return this.request<{
+      id: string;
+      name: string;
+      avatarUrl?: string;
+      headline?: string;
+      bio?: string;
+      expertise?: string[];
+      experience?: string;
+      website?: string;
+      socialLinks?: {
+        twitter?: string;
+        linkedin?: string;
+        youtube?: string;
+      };
+      totalStudents: number;
+      totalCourses: number;
+      totalReviews: number;
+      averageRating: number;
+      isVerified?: boolean;
+    }>(`/v1/users/${instructorId}/instructor-profile`);
+  }
+
+  async getInstructorPublicCourses(instructorId: string) {
+    return this.request<{
+      courses: Array<{
+        id: string;
+        title: string;
+        subtitle?: string;
+        thumbnailUrl?: string;
+        price: number;
+        currency: string;
+        level: string;
+        totalDuration: number;
+        totalLectures: number;
+        averageRating: number;
+        totalReviews: number;
+        totalEnrollments: number;
+      }>;
+    }>(`/v1/users/${instructorId}/courses`);
+  }
+
+  async getInstructorPublicReviews(instructorId: string, params?: { page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const query = searchParams.toString();
+    return this.request<{
+      reviews: Array<{
+        id: string;
+        courseId: string;
+        courseTitle: string;
+        rating: number;
+        title?: string;
+        content?: string;
+        userName: string;
+        createdAt: string;
+      }>;
+      pagination: any;
+    }>(`/v1/users/${instructorId}/reviews${query ? `?${query}` : ''}`);
   }
 }
 

@@ -257,6 +257,83 @@ progressRoutes.get('/my-progress', requireAuth, async (c) => {
   }
 });
 
+// 週間学習時間を取得
+progressRoutes.get('/weekly-study-time', requireAuth, async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    const now = new Date();
+    const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+    
+    // 過去7日間の日付を生成
+    const dates = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      dates.push({
+        date: date.toISOString().split('T')[0],
+        dayOfWeek: dayNames[date.getDay()],
+      });
+    }
+
+    // 今週の開始日と先週の開始日を計算
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - 6);
+    thisWeekStart.setHours(0, 0, 0, 0);
+    
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
+    
+    const lastWeekEnd = new Date(thisWeekStart);
+    lastWeekEnd.setMilliseconds(-1);
+
+    // 過去7日間の学習時間を日別で取得
+    const watchLogs = await c.env.DB.prepare(`
+      SELECT 
+        DATE(start_time) as log_date,
+        SUM(watched_seconds) as total_seconds
+      FROM el_watch_logs
+      WHERE user_id = ? AND start_time >= ?
+      GROUP BY DATE(start_time)
+      ORDER BY log_date
+    `).bind(userId, thisWeekStart.toISOString()).all();
+
+    // 先週の合計学習時間
+    const lastWeekTotal = await c.env.DB.prepare(`
+      SELECT COALESCE(SUM(watched_seconds), 0) as total
+      FROM el_watch_logs
+      WHERE user_id = ? AND start_time >= ? AND start_time <= ?
+    `).bind(userId, lastWeekStart.toISOString(), lastWeekEnd.toISOString()).first<{ total: number }>();
+
+    // 日別データをマップに変換
+    const logMap = new Map<string, number>();
+    for (const log of watchLogs.results as any[]) {
+      logMap.set(log.log_date, Math.round((log.total_seconds || 0) / 60));
+    }
+
+    // 週間データを生成
+    const weeklyData = dates.map(d => ({
+      dayOfWeek: d.dayOfWeek,
+      date: d.date,
+      totalMinutes: logMap.get(d.date) || 0,
+    }));
+
+    const thisWeekTotal = weeklyData.reduce((sum, d) => sum + d.totalMinutes, 0);
+
+    return c.json({
+      success: true,
+      data: {
+        weeklyData,
+        thisWeekTotal,
+        lastWeekTotal: Math.round((lastWeekTotal?.total || 0) / 60),
+      }
+    });
+  } catch (error) {
+    console.error('Get weekly study time error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
+  }
+});
+
 // コースに登録
 progressRoutes.post('/courses/:courseId/enroll', requireAuth, async (c) => {
   const userId = c.get('userId');

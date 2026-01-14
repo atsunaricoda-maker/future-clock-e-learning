@@ -12,13 +12,21 @@ import {
   SkipForward,
   Settings,
   Check,
-  Loader2
+  Loader2,
+  Subtitles
 } from 'lucide-react';
+
+interface Subtitle {
+  language: string;
+  label: string;
+  vttUrl: string;
+}
 
 interface VideoPlayerProps {
   src: string;
   poster?: string;
   title?: string;
+  subtitles?: Subtitle[];
   onProgress?: (currentTime: number, duration: number) => void;
   onComplete?: () => void;
   initialTime?: number;
@@ -29,6 +37,7 @@ export function VideoPlayer({
   src,
   poster,
   title,
+  subtitles = [],
   onProgress,
   onComplete,
   initialTime = 0,
@@ -48,6 +57,8 @@ export function VideoPlayer({
   const [showSettings, setShowSettings] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+  const [activeSubtitleIndex, setActiveSubtitleIndex] = useState(0);
   const hideControlsTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -205,6 +216,30 @@ export function VideoPlayer({
 
   const playbackRates = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
+  // Subtitle toggle
+  const toggleSubtitles = () => {
+    const video = videoRef.current;
+    if (!video || subtitles.length === 0) return;
+
+    const newEnabled = !subtitlesEnabled;
+    setSubtitlesEnabled(newEnabled);
+    
+    // Toggle all text tracks
+    for (let i = 0; i < video.textTracks.length; i++) {
+      video.textTracks[i].mode = newEnabled && i === activeSubtitleIndex ? 'showing' : 'hidden';
+    }
+  };
+
+  const changeSubtitle = (index: number) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setActiveSubtitleIndex(index);
+    for (let i = 0; i < video.textTracks.length; i++) {
+      video.textTracks[i].mode = subtitlesEnabled && i === index ? 'showing' : 'hidden';
+    }
+  };
+
   return (
     <div
       ref={containerRef}
@@ -220,7 +255,19 @@ export function VideoPlayer({
         className="w-full aspect-video"
         onClick={togglePlay}
         playsInline
-      />
+        crossOrigin="anonymous"
+      >
+        {subtitles.map((sub, index) => (
+          <track
+            key={sub.language}
+            kind="subtitles"
+            src={sub.vttUrl}
+            srcLang={sub.language}
+            label={sub.label}
+            default={index === 0 && subtitlesEnabled}
+          />
+        ))}
+      </video>
 
       {/* Loading Overlay */}
       {isLoading && (
@@ -317,6 +364,49 @@ export function VideoPlayer({
 
           {/* Right Controls */}
           <div className="flex items-center gap-3">
+            {/* Subtitles Toggle */}
+            {subtitles.length > 0 && (
+              <div className="relative group/subtitles">
+                <button
+                  onClick={toggleSubtitles}
+                  className={`transition-colors ${subtitlesEnabled ? 'text-blue-400' : 'text-white hover:text-blue-400'}`}
+                  title="字幕"
+                >
+                  <Subtitles className="h-5 w-5" />
+                </button>
+                
+                {subtitles.length > 1 && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-gray-900 rounded-lg py-2 min-w-[120px] hidden group-hover/subtitles:block">
+                    <p className="text-xs text-gray-400 px-3 mb-1">字幕</p>
+                    <button
+                      onClick={() => setSubtitlesEnabled(false)}
+                      className={`w-full px-3 py-1 text-sm text-left hover:bg-gray-800 flex items-center justify-between ${
+                        !subtitlesEnabled ? 'text-blue-400' : 'text-white'
+                      }`}
+                    >
+                      <span>オフ</span>
+                      {!subtitlesEnabled && <Check className="h-4 w-4" />}
+                    </button>
+                    {subtitles.map((sub, index) => (
+                      <button
+                        key={sub.language}
+                        onClick={() => {
+                          setSubtitlesEnabled(true);
+                          changeSubtitle(index);
+                        }}
+                        className={`w-full px-3 py-1 text-sm text-left hover:bg-gray-800 flex items-center justify-between ${
+                          subtitlesEnabled && activeSubtitleIndex === index ? 'text-blue-400' : 'text-white'
+                        }`}
+                      >
+                        <span>{sub.label}</span>
+                        {subtitlesEnabled && activeSubtitleIndex === index && <Check className="h-4 w-4" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Playback Rate */}
             <div className="relative">
               <button

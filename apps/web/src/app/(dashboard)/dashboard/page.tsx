@@ -2,11 +2,23 @@
 
 import { useAuth } from '@/lib/auth';
 import { useEffect, useState } from 'react';
-import { BookOpen, Clock, Award, TrendingUp } from 'lucide-react';
+import { BookOpen, Clock, Award, TrendingUp, BarChart3 } from 'lucide-react';
+import { ProgressChart } from '@/components/dashboard/ProgressChart';
+import { api } from '@/lib/api';
+
+interface DashboardStats {
+  enrolledCourses: number;
+  weeklyStudyTime: string;
+  completedCertificates: number;
+  averageProgress: number;
+}
 
 export default function DashboardPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const [shouldRedirect, setShouldRedirect] = useState(false);
+  const [showProgressChart, setShowProgressChart] = useState(false);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   console.log('Dashboard render:', { isLoading, isAuthenticated, user: user?.email });
 
@@ -30,6 +42,51 @@ export default function DashboardPage() {
     }
   }, [shouldRedirect]);
 
+  // Fetch dashboard stats
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        const [progressRes, certsRes, weeklyRes] = await Promise.all([
+          api.getMyProgress(),
+          api.getCertificates(),
+          api.getWeeklyStudyTime(),
+        ]);
+
+        const courses = progressRes.data?.courses || [];
+        const certificates = certsRes.data?.certificates || [];
+        const weeklyTotal = weeklyRes.data?.thisWeekTotal || 0;
+
+        const avgProgress = courses.length > 0
+          ? Math.round(courses.reduce((sum, c) => sum + c.progressPercent, 0) / courses.length)
+          : 0;
+
+        const formatWeeklyTime = (minutes: number) => {
+          const hours = Math.floor(minutes / 60);
+          const mins = minutes % 60;
+          if (hours > 0) {
+            return `${hours}時間${mins > 0 ? `${mins}分` : ''}`;
+          }
+          return `${mins}分`;
+        };
+
+        setStats({
+          enrolledCourses: courses.length,
+          weeklyStudyTime: formatWeeklyTime(weeklyTotal),
+          completedCertificates: certificates.length,
+          averageProgress: avgProgress,
+        });
+      } catch (error) {
+        console.error('Failed to fetch dashboard stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, [isAuthenticated]);
+
   // ローディング中またはリダイレクト待機中は待機
   if (isLoading || shouldRedirect) {
     return (
@@ -52,31 +109,31 @@ export default function DashboardPage() {
     return null;
   }
 
-  const stats = [
+  const statCards = [
     {
       label: '受講中のコース',
-      value: '3',
+      value: statsLoading ? '-' : String(stats?.enrolledCourses || 0),
       icon: BookOpen,
       color: 'text-blue-600',
       bgColor: 'bg-blue-100',
     },
     {
       label: '今週の学習時間',
-      value: '12時間',
+      value: statsLoading ? '-' : (stats?.weeklyStudyTime || '0分'),
       icon: Clock,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
     },
     {
       label: '取得した修了証',
-      value: '2',
+      value: statsLoading ? '-' : String(stats?.completedCertificates || 0),
       icon: Award,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-100',
     },
     {
       label: '学習進捗',
-      value: '65%',
+      value: statsLoading ? '-' : `${stats?.averageProgress || 0}%`,
       icon: TrendingUp,
       color: 'text-purple-600',
       bgColor: 'bg-purple-100',
@@ -96,7 +153,7 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, index) => {
+        {statCards.map((stat, index) => {
           const Icon = stat.icon;
           return (
             <div
@@ -116,6 +173,21 @@ export default function DashboardPage() {
           );
         })}
       </div>
+
+      {/* Progress Charts Toggle */}
+      <div className="flex justify-between items-center">
+        <h2 className="text-lg font-semibold">学習進捗の詳細</h2>
+        <button
+          onClick={() => setShowProgressChart(!showProgressChart)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 rounded-lg transition-colors"
+        >
+          <BarChart3 className="h-4 w-4" />
+          {showProgressChart ? 'グラフを隠す' : 'グラフを表示'}
+        </button>
+      </div>
+
+      {/* Progress Chart */}
+      {showProgressChart && <ProgressChart />}
 
       {/* Continue Learning Section */}
       <div>

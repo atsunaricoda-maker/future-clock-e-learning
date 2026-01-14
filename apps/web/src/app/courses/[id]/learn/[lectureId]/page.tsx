@@ -2,7 +2,7 @@
 
 export const runtime = 'edge';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
@@ -21,6 +21,12 @@ import {
   X,
   Loader2,
   Lock,
+  BookOpen,
+  Bookmark,
+  Edit3,
+  Trash2,
+  Plus,
+  Save,
 } from 'lucide-react';
 
 interface Lecture {
@@ -44,10 +50,26 @@ interface Course {
   sections: Section[];
 }
 
+interface Note {
+  id: string;
+  content: string;
+  timestampSeconds: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BookmarkItem {
+  id: string;
+  title: string | null;
+  timestampSeconds: number;
+  createdAt: string;
+}
+
 export default function LearnPage() {
   const params = useParams();
   const router = useRouter();
   const { isLoading: authLoading, isAuthenticated } = useAuth();
+  const videoRef = useRef<HTMLVideoElement>(null);
   
   const courseId = params.id as string;
   const lectureId = params.lectureId as string;
@@ -61,6 +83,16 @@ export default function LearnPage() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [progress, setProgress] = useState<Map<string, boolean>>(new Map());
   const [isEnrolled, setIsEnrolled] = useState(false);
+  
+  // Notes & Bookmarks state
+  const [activeTab, setActiveTab] = useState<'notes' | 'bookmarks'>('notes');
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [currentVideoTime, setCurrentVideoTime] = useState(0);
+  const [showNotesPanel, setShowNotesPanel] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -81,12 +113,12 @@ export default function LearnPage() {
     if (course && lectureId) {
       findAndSetCurrentLecture();
       fetchVideoUrl();
+      fetchNotesAndBookmarks();
     }
   }, [course, lectureId]);
 
   const fetchCourseData = async () => {
     try {
-      // コース情報を取得
       const courseResponse = await api.getCourse(courseId);
       if (courseResponse.success && courseResponse.data) {
         setCourse({
@@ -99,13 +131,11 @@ export default function LearnPage() {
         return;
       }
 
-      // 受講登録確認
       const progressResponse = await api.getCourseProgress(courseId);
       if (progressResponse.success) {
         setIsEnrolled(true);
       }
 
-      // 講義の進捗を取得
       const lecturesProgressResponse = await api.getLecturesProgress(courseId);
       if (lecturesProgressResponse.success && lecturesProgressResponse.data) {
         const progressMap = new Map<string, boolean>();
@@ -119,6 +149,24 @@ export default function LearnPage() {
       setError('コースの取得に失敗しました');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNotesAndBookmarks = async () => {
+    try {
+      const [notesRes, bookmarksRes] = await Promise.all([
+        api.getNotes({ lectureId }),
+        api.getBookmarks({ lectureId }),
+      ]);
+
+      if (notesRes.success && notesRes.data) {
+        setNotes(notesRes.data.notes || []);
+      }
+      if (bookmarksRes.success && bookmarksRes.data) {
+        setBookmarks(bookmarksRes.data.bookmarks || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notes/bookmarks:', err);
     }
   };
 
@@ -150,7 +198,7 @@ export default function LearnPage() {
   };
 
   const handleVideoProgress = useCallback((currentTime: number, duration: number) => {
-    // 80%以上視聴したら完了とみなす
+    setCurrentVideoTime(currentTime);
     if (currentTime / duration >= 0.8 && currentLecture && !progress.get(currentLecture.id)) {
       handleCompleteLecture();
     }
@@ -167,6 +215,99 @@ export default function LearnPage() {
       }
     } catch (err) {
       console.error('Failed to complete lecture:', err);
+    }
+  };
+
+  // Notes handlers
+  const handleAddNote = async () => {
+    if (!newNoteContent.trim()) return;
+
+    try {
+      const response = await api.createNote({
+        lectureId,
+        content: newNoteContent,
+        timestampSeconds: Math.floor(currentVideoTime),
+      });
+
+      if (response.success && response.data) {
+        const newNote: Note = {
+          id: response.data.id,
+          content: response.data.content,
+          timestampSeconds: response.data.timestampSeconds,
+          createdAt: response.data.createdAt,
+          updatedAt: response.data.createdAt,
+        };
+        setNotes(prev => [newNote, ...prev]);
+        setNewNoteContent('');
+      }
+    } catch (err) {
+      console.error('Failed to create note:', err);
+    }
+  };
+
+  const handleUpdateNote = async (noteId: string) => {
+    if (!editingContent.trim()) return;
+
+    try {
+      const response = await api.updateNote(noteId, { content: editingContent });
+      if (response.success) {
+        setNotes(prev => prev.map(n => n.id === noteId ? { ...n, content: editingContent, updatedAt: new Date().toISOString() } : n));
+        setEditingNoteId(null);
+        setEditingContent('');
+      }
+    } catch (err) {
+      console.error('Failed to update note:', err);
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    if (!confirm('このノートを削除しますか？')) return;
+
+    try {
+      const response = await api.deleteNote(noteId);
+      if (response.success) {
+        setNotes(prev => prev.filter(n => n.id !== noteId));
+      }
+    } catch (err) {
+      console.error('Failed to delete note:', err);
+    }
+  };
+
+  // Bookmarks handlers
+  const handleAddBookmark = async () => {
+    const timestamp = Math.floor(currentVideoTime);
+    const title = prompt('ブックマークの名前（任意）：');
+
+    try {
+      const response = await api.createBookmark({
+        lectureId,
+        timestampSeconds: timestamp,
+        title: title || undefined,
+      });
+
+      if (response.success && response.data) {
+        setBookmarks(prev => [...prev, response.data!].sort((a, b) => a.timestampSeconds - b.timestampSeconds));
+      }
+    } catch (err) {
+      console.error('Failed to create bookmark:', err);
+    }
+  };
+
+  const handleDeleteBookmark = async (bookmarkId: string) => {
+    try {
+      const response = await api.deleteBookmark(bookmarkId);
+      if (response.success) {
+        setBookmarks(prev => prev.filter(b => b.id !== bookmarkId));
+      }
+    } catch (err) {
+      console.error('Failed to delete bookmark:', err);
+    }
+  };
+
+  const seekToTime = (seconds: number) => {
+    // VideoPlayerコンポーネントにseek機能を追加する場合用
+    if (videoRef.current) {
+      videoRef.current.currentTime = seconds;
     }
   };
 
@@ -190,7 +331,7 @@ export default function LearnPage() {
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -226,7 +367,6 @@ export default function LearnPage() {
         }`}
       >
         <div className="h-full overflow-y-auto">
-          {/* Header */}
           <div className="sticky top-0 bg-gray-800 border-b border-gray-700 p-4">
             <div className="flex items-center justify-between">
               <Link href={`/courses/${courseId}`} className="text-blue-400 hover:text-blue-300 text-sm">
@@ -242,7 +382,6 @@ export default function LearnPage() {
             <h2 className="text-white font-semibold mt-2 line-clamp-2">{course?.title}</h2>
           </div>
 
-          {/* Sections */}
           <div className="p-2">
             {course?.sections.map((section, sectionIndex) => (
               <div key={section.id} className="mb-2">
@@ -300,7 +439,6 @@ export default function LearnPage() {
 
       {/* Main Content */}
       <div className="flex-1 min-w-0">
-        {/* Toggle Sidebar Button */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="fixed top-4 left-4 z-50 lg:hidden bg-gray-800 p-2 rounded-lg text-white"
@@ -344,13 +482,183 @@ export default function LearnPage() {
               </div>
             </div>
 
-            {!currentLecture?.isCompleted && (
-              <Button onClick={handleCompleteLecture}>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                完了としてマーク
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowNotesPanel(!showNotesPanel)}
+                className="gap-2"
+              >
+                <BookOpen className="h-4 w-4" />
+                ノート・ブックマーク
               </Button>
-            )}
+              {!currentLecture?.isCompleted && (
+                <Button onClick={handleCompleteLecture}>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  完了としてマーク
+                </Button>
+              )}
+            </div>
           </div>
+
+          {/* Notes & Bookmarks Panel */}
+          {showNotesPanel && (
+            <div className="mb-6 bg-gray-800 rounded-xl p-4">
+              {/* Tabs */}
+              <div className="flex items-center gap-4 border-b border-gray-700 pb-3 mb-4">
+                <button
+                  onClick={() => setActiveTab('notes')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === 'notes' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Edit3 className="h-4 w-4" />
+                  ノート ({notes.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('bookmarks')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    activeTab === 'bookmarks' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <Bookmark className="h-4 w-4" />
+                  ブックマーク ({bookmarks.length})
+                </button>
+              </div>
+
+              {/* Notes Tab */}
+              {activeTab === 'notes' && (
+                <div className="space-y-4">
+                  {/* Add Note */}
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <textarea
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        placeholder="ノートを追加... (現在の再生位置に紐付けられます)"
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm resize-none"
+                        rows={2}
+                      />
+                    </div>
+                    <Button onClick={handleAddNote} disabled={!newNoteContent.trim()}>
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  {/* Notes List */}
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {notes.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-4">
+                        まだノートがありません
+                      </p>
+                    ) : (
+                      notes.map((note) => (
+                        <div key={note.id} className="bg-gray-700 rounded-lg p-3">
+                          {editingNoteId === note.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                value={editingContent}
+                                onChange={(e) => setEditingContent(e.target.value)}
+                                className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded text-white text-sm resize-none"
+                                rows={3}
+                              />
+                              <div className="flex justify-end gap-2">
+                                <Button size="sm" variant="ghost" onClick={() => setEditingNoteId(null)}>
+                                  キャンセル
+                                </Button>
+                                <Button size="sm" onClick={() => handleUpdateNote(note.id)}>
+                                  <Save className="h-3 w-3 mr-1" />
+                                  保存
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  {note.timestampSeconds !== null && (
+                                    <button
+                                      onClick={() => seekToTime(note.timestampSeconds!)}
+                                      className="text-blue-400 hover:text-blue-300 text-xs mb-1"
+                                    >
+                                      {formatDuration(note.timestampSeconds)}
+                                    </button>
+                                  )}
+                                  <p className="text-gray-200 text-sm whitespace-pre-wrap">{note.content}</p>
+                                </div>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <button
+                                    onClick={() => {
+                                      setEditingNoteId(note.id);
+                                      setEditingContent(note.content);
+                                    }}
+                                    className="text-gray-400 hover:text-white p-1"
+                                  >
+                                    <Edit3 className="h-3 w-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteNote(note.id)}
+                                    className="text-gray-400 hover:text-red-400 p-1"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Bookmarks Tab */}
+              {activeTab === 'bookmarks' && (
+                <div className="space-y-4">
+                  {/* Add Bookmark */}
+                  <Button onClick={handleAddBookmark} className="gap-2">
+                    <Bookmark className="h-4 w-4" />
+                    現在の位置にブックマークを追加 ({formatDuration(currentVideoTime)})
+                  </Button>
+
+                  {/* Bookmarks List */}
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {bookmarks.length === 0 ? (
+                      <p className="text-gray-500 text-sm text-center py-4">
+                        まだブックマークがありません
+                      </p>
+                    ) : (
+                      bookmarks.map((bookmark) => (
+                        <div
+                          key={bookmark.id}
+                          className="flex items-center justify-between bg-gray-700 rounded-lg p-3"
+                        >
+                          <button
+                            onClick={() => seekToTime(bookmark.timestampSeconds)}
+                            className="flex items-center gap-3 text-left hover:text-blue-400"
+                          >
+                            <span className="text-blue-400 font-mono text-sm">
+                              {formatDuration(bookmark.timestampSeconds)}
+                            </span>
+                            <span className="text-gray-200 text-sm">
+                              {bookmark.title || 'ブックマーク'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteBookmark(bookmark.id)}
+                            className="text-gray-400 hover:text-red-400 p-1"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Navigation */}
           <div className="flex justify-between mt-8 border-t border-gray-700 pt-6">

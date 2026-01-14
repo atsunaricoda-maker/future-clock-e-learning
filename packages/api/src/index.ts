@@ -28,6 +28,7 @@ import { couponsRoutes } from './routes/coupons';
 import { questionsRoutes } from './routes/questions';
 import { wishlistRoutes } from './routes/wishlist';
 import { emailRoutes } from './routes/email';
+import { notesRoutes } from './routes/notes';
 
 // Create Hono app with typed environment
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -117,6 +118,9 @@ api.route('/wishlist', wishlistRoutes);
 
 // Email routes (password reset, etc.)
 api.route('/email', emailRoutes);
+
+// Notes & Bookmarks routes
+api.route('/notes', notesRoutes);
 
 // Mount API under /v1
 app.route('/v1', api);

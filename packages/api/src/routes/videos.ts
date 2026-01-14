@@ -285,7 +285,7 @@ videosRoutes.get('/playback/:lectureId', requireAuth, async (c) => {
   try {
     // 講義と動画情報を取得
     const lecture = await c.env.DB.prepare(`
-      SELECT l.id, l.is_free, l.section_id, s.course_id, v.hls_url, v.original_url, v.thumbnail_url, v.duration
+      SELECT l.id, l.is_free, l.section_id, s.course_id, v.id as video_id, v.hls_url, v.original_url, v.thumbnail_url, v.duration
       FROM el_lectures l
       JOIN el_sections s ON l.section_id = s.id
       LEFT JOIN el_videos v ON l.id = v.lecture_id
@@ -312,6 +312,24 @@ videosRoutes.get('/playback/:lectureId', requireAuth, async (c) => {
       return c.json({ success: false, error: { code: 'NO_VIDEO', message: 'この講義には動画がありません' } }, 404);
     }
 
+    // 字幕を取得
+    let subtitles: any[] = [];
+    if ((lecture as any).video_id) {
+      const subtitleResults = await c.env.DB.prepare(`
+        SELECT id, language, label, vtt_url, is_default
+        FROM el_video_subtitles
+        WHERE video_id = ?
+        ORDER BY is_default DESC, language
+      `).bind((lecture as any).video_id).all();
+      
+      subtitles = subtitleResults.results.map((s: any) => ({
+        language: s.language,
+        label: s.label,
+        vttUrl: s.vtt_url,
+        isDefault: s.is_default === 1,
+      }));
+    }
+
     // 署名付きURLを生成（本番環境ではCloudflare Streamの署名トークンを使用）
     const accountId = c.env.CLOUDFLARE_ACCOUNT_ID;
     const apiToken = c.env.CLOUDFLARE_STREAM_API_TOKEN;
@@ -333,11 +351,157 @@ videosRoutes.get('/playback/:lectureId', requireAuth, async (c) => {
         thumbnailUrl: (lecture as any).thumbnail_url,
         duration: (lecture as any).duration,
         isFree: !!(lecture as any).is_free,
+        subtitles,
       }
     });
   } catch (error) {
     console.error('Get playback URL error:', error);
     return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
+  }
+});
+
+// =============================================
+// 字幕管理API
+// =============================================
+
+// 字幕一覧取得
+videosRoutes.get('/:videoId/subtitles', requireAuth, async (c) => {
+  const { videoId } = c.req.param();
+
+  try {
+    const subtitles = await c.env.DB.prepare(`
+      SELECT id, language, label, vtt_url, is_default, created_at
+      FROM el_video_subtitles
+      WHERE video_id = ?
+      ORDER BY is_default DESC, language
+    `).bind(videoId).all();
+
+    return c.json({
+      success: true,
+      data: {
+        subtitles: subtitles.results.map((s: any) => ({
+          id: s.id,
+          language: s.language,
+          label: s.label,
+          vttUrl: s.vtt_url,
+          isDefault: s.is_default === 1,
+          createdAt: s.created_at,
+        })),
+      }
+    });
+  } catch (error) {
+    console.error('Get subtitles error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: '字幕の取得に失敗しました' } }, 500);
+  }
+});
+
+// 字幕追加
+const addSubtitleSchema = z.object({
+  language: z.string().min(2).max(10).default('ja'),
+  label: z.string().min(1).max(50).default('日本語'),
+  vttUrl: z.string().url(),
+  isDefault: z.boolean().default(false),
+});
+
+videosRoutes.post(
+  '/:videoId/subtitles',
+  requireAuth,
+  requireInstructor,
+  zValidator('json', addSubtitleSchema),
+  async (c) => {
+    const { videoId } = c.req.param();
+    const { language, label, vttUrl, isDefault } = c.req.valid('json');
+
+    try {
+      // 動画の存在確認とコース所有者確認
+      const video = await c.env.DB.prepare(`
+        SELECT v.id, c.instructor_id
+        FROM el_videos v
+        JOIN el_lectures l ON v.lecture_id = l.id
+        JOIN el_sections s ON l.section_id = s.id
+        JOIN el_courses c ON s.course_id = c.id
+        WHERE v.id = ?
+      `).bind(videoId).first();
+
+      if (!video) {
+        return c.json({ success: false, error: { code: 'NOT_FOUND', message: '動画が見つかりません' } }, 404);
+      }
+
+      const userId = c.get('userId');
+      const role = c.get('userRole');
+      if ((video as any).instructor_id !== userId && role !== 'admin') {
+        return c.json({ success: false, error: { code: 'FORBIDDEN', message: '権限がありません' } }, 403);
+      }
+
+      const now = new Date().toISOString();
+      const subtitleId = crypto.randomUUID();
+
+      // デフォルトを設定する場合、既存のデフォルトを解除
+      if (isDefault) {
+        await c.env.DB.prepare(`
+          UPDATE el_video_subtitles SET is_default = 0, updated_at = ? WHERE video_id = ?
+        `).bind(now, videoId).run();
+      }
+
+      await c.env.DB.prepare(`
+        INSERT INTO el_video_subtitles (id, video_id, language, label, vtt_url, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(subtitleId, videoId, language, label, vttUrl, isDefault ? 1 : 0, now, now).run();
+
+      return c.json({
+        success: true,
+        data: {
+          id: subtitleId,
+          language,
+          label,
+          vttUrl,
+          isDefault,
+        },
+        message: '字幕を追加しました',
+      }, 201);
+    } catch (error) {
+      console.error('Add subtitle error:', error);
+      return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: '字幕の追加に失敗しました' } }, 500);
+    }
+  }
+);
+
+// 字幕削除
+videosRoutes.delete('/:videoId/subtitles/:subtitleId', requireAuth, requireInstructor, async (c) => {
+  const { videoId, subtitleId } = c.req.param();
+
+  try {
+    // 動画の存在確認とコース所有者確認
+    const video = await c.env.DB.prepare(`
+      SELECT v.id, c.instructor_id
+      FROM el_videos v
+      JOIN el_lectures l ON v.lecture_id = l.id
+      JOIN el_sections s ON l.section_id = s.id
+      JOIN el_courses c ON s.course_id = c.id
+      WHERE v.id = ?
+    `).bind(videoId).first();
+
+    if (!video) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: '動画が見つかりません' } }, 404);
+    }
+
+    const userId = c.get('userId');
+    const role = c.get('userRole');
+    if ((video as any).instructor_id !== userId && role !== 'admin') {
+      return c.json({ success: false, error: { code: 'FORBIDDEN', message: '権限がありません' } }, 403);
+    }
+
+    await c.env.DB.prepare(`
+      DELETE FROM el_video_subtitles WHERE id = ? AND video_id = ?
+    `).bind(subtitleId, videoId).run();
+
+    return c.json({
+      success: true,
+      message: '字幕を削除しました',
+    });
+  } catch (error) {
+    console.error('Delete subtitle error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: '字幕の削除に失敗しました' } }, 500);
   }
 });
 

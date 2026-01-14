@@ -24,7 +24,8 @@ import {
   Heart,
   ThumbsUp,
   MessageCircle,
-  User
+  User,
+  X
 } from 'lucide-react';
 
 interface Course {
@@ -51,6 +52,7 @@ interface Course {
   totalDuration: number;
   totalLectures: number;
   thumbnailUrl?: string;
+  promoVideoUrl?: string;
   sections?: Section[];
   whatYouWillLearn?: string[];
   requirements?: string[];
@@ -107,6 +109,9 @@ export default function CourseDetailPage() {
   
   // Q&A
   const [activeTab, setActiveTab] = useState<'overview' | 'reviews' | 'qa'>('overview');
+  
+  // Preview Video Modal
+  const [showPreviewVideo, setShowPreviewVideo] = useState(false);
 
   useEffect(() => {
     if (params.id) {
@@ -375,11 +380,19 @@ export default function CourseDetailPage() {
                         <Play className="h-12 w-12 text-muted-foreground" />
                       </div>
                     )}
-                    <button className="absolute inset-0 flex items-center justify-center bg-black/50 hover:bg-black/40 transition-colors">
+                    <button 
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 hover:bg-black/40 transition-colors"
+                      onClick={() => course.promoVideoUrl && setShowPreviewVideo(true)}
+                    >
                       <div className="rounded-full bg-white p-4">
                         <Play className="h-8 w-8 text-primary fill-primary" />
                       </div>
                     </button>
+                    {course.promoVideoUrl && (
+                      <span className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                        プレビューを見る
+                      </span>
+                    )}
                   </div>
                   <div className="p-6">
                     <div className="text-3xl font-bold">
@@ -832,6 +845,38 @@ export default function CourseDetailPage() {
           <p>&copy; 2026 FutureClock Inc. All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Preview Video Modal */}
+      {showPreviewVideo && course.promoVideoUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/80" 
+            onClick={() => setShowPreviewVideo(false)}
+          />
+          <div className="relative w-full max-w-4xl">
+            <button
+              onClick={() => setShowPreviewVideo(false)}
+              className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <X className="h-8 w-8" />
+            </button>
+            <div className="bg-black rounded-xl overflow-hidden">
+              <video
+                src={course.promoVideoUrl}
+                controls
+                autoPlay
+                className="w-full aspect-video"
+              >
+                お使いのブラウザは動画再生に対応していません。
+              </video>
+            </div>
+            <div className="mt-4 text-center">
+              <h3 className="text-white text-lg font-semibold">{course.title}</h3>
+              <p className="text-gray-400 text-sm mt-1">コースプレビュー</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

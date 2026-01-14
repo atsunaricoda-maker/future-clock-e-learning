@@ -10,18 +10,22 @@ import {
   BookOpen, 
   BarChart3, 
   DollarSign,
-  MessageSquare,
   Settings,
-  Plus
+  Plus,
+  Video,
+  Ticket,
+  HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const sidebarItems = [
   { href: '/instructor', label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/instructor/courses', label: 'コース管理', icon: BookOpen },
+  { href: '/instructor/videos', label: '動画管理', icon: Video },
   { href: '/instructor/analytics', label: '分析', icon: BarChart3 },
-  { href: '/instructor/earnings', label: '収益', icon: DollarSign },
-  { href: '/instructor/messages', label: 'メッセージ', icon: MessageSquare },
+  { href: '/instructor/revenue', label: '収益', icon: DollarSign },
+  { href: '/instructor/coupons', label: 'クーポン', icon: Ticket },
+  { href: '/instructor/questions', label: 'Q&A対応', icon: HelpCircle },
   { href: '/instructor/settings', label: '設定', icon: Settings },
 ];
 

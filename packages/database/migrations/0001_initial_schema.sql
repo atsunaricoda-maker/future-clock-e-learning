@@ -440,3 +440,33 @@ CREATE TABLE IF NOT EXISTS el_password_reset_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON el_password_reset_tokens(token);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON el_password_reset_tokens(user_id);
+
+-- Notes (学習ノート)
+CREATE TABLE IF NOT EXISTS notes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lecture_id TEXT NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  timestamp_seconds INTEGER, -- 動画の再生位置
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_lecture_id ON notes(lecture_id);
+CREATE INDEX IF NOT EXISTS idx_notes_user_lecture ON notes(user_id, lecture_id);
+
+-- Bookmarks (ブックマーク)
+CREATE TABLE IF NOT EXISTS bookmarks (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lecture_id TEXT NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+  title TEXT,
+  timestamp_seconds INTEGER NOT NULL, -- 動画の再生位置
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(user_id, lecture_id, timestamp_seconds)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_id ON bookmarks(user_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_lecture_id ON bookmarks(lecture_id);
+CREATE INDEX IF NOT EXISTS idx_bookmarks_user_lecture ON bookmarks(user_id, lecture_id);

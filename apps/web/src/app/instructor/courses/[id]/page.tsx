@@ -26,7 +26,11 @@ import {
   X,
   Check,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Send,
+  CheckCircle,
+  XCircle,
+  RefreshCw
 } from 'lucide-react';
 
 interface Section {
@@ -59,7 +63,151 @@ interface Course {
   price: number;
   currency: string;
   status: string;
+  rejectionReason?: string;
+  totalLectures?: number;
   sections: Section[];
+}
+
+// Course Status Section Component
+function CourseStatusSection({ 
+  course, 
+  onSubmitForReview 
+}: { 
+  course: Course; 
+  onSubmitForReview: () => void;
+}) {
+  const getStatusInfo = () => {
+    switch (course.status) {
+      case 'draft':
+        return {
+          color: 'bg-gray-100 border-gray-200',
+          textColor: 'text-gray-700',
+          icon: <Edit className="h-5 w-5" />,
+          label: '下書き',
+          description: 'このコースはまだ公開されていません。',
+        };
+      case 'pending_review':
+        return {
+          color: 'bg-yellow-50 border-yellow-200',
+          textColor: 'text-yellow-700',
+          icon: <Clock className="h-5 w-5" />,
+          label: '審査中',
+          description: '管理者が内容を確認しています。通常1-3営業日かかります。',
+        };
+      case 'published':
+        return {
+          color: 'bg-green-50 border-green-200',
+          textColor: 'text-green-700',
+          icon: <CheckCircle className="h-5 w-5" />,
+          label: '公開中',
+          description: 'このコースは受講者に公開されています。',
+        };
+      case 'rejected':
+        return {
+          color: 'bg-red-50 border-red-200',
+          textColor: 'text-red-700',
+          icon: <XCircle className="h-5 w-5" />,
+          label: '審査却下',
+          description: '審査が却下されました。内容を修正して再申請してください。',
+        };
+      default:
+        return {
+          color: 'bg-gray-100 border-gray-200',
+          textColor: 'text-gray-700',
+          icon: <AlertCircle className="h-5 w-5" />,
+          label: '不明',
+          description: '',
+        };
+    }
+  };
+
+  const statusInfo = getStatusInfo();
+  const canSubmitForReview = course.status === 'draft' || course.status === 'rejected';
+  const hasMinimumContent = (course.totalLectures || 0) >= 1;
+
+  return (
+    <div className={`p-4 border rounded-lg ${statusInfo.color}`}>
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3">
+          <div className={statusInfo.textColor}>
+            {statusInfo.icon}
+          </div>
+          <div>
+            <p className={`font-medium ${statusInfo.textColor}`}>
+              ステータス: {statusInfo.label}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              {statusInfo.description}
+            </p>
+            
+            {/* 却下理由の表示 */}
+            {course.status === 'rejected' && course.rejectionReason && (
+              <div className="mt-3 p-3 bg-red-100 rounded-lg">
+                <p className="text-sm font-medium text-red-800">却下理由:</p>
+                <p className="text-sm text-red-700 mt-1">{course.rejectionReason}</p>
+              </div>
+            )}
+
+            {/* 審査申請の要件チェック */}
+            {canSubmitForReview && (
+              <div className="mt-3 space-y-2">
+                <p className="text-sm font-medium">審査申請の要件:</p>
+                <div className="space-y-1">
+                  <div className={`flex items-center gap-2 text-sm ${hasMinimumContent ? 'text-green-600' : 'text-red-600'}`}>
+                    {hasMinimumContent ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                    1つ以上のレッスンがある
+                  </div>
+                  <div className={`flex items-center gap-2 text-sm ${course.price >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <Check className="h-4 w-4" />
+                    価格が設定されている
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div>
+          {canSubmitForReview && (
+            <Button 
+              onClick={onSubmitForReview}
+              disabled={!hasMinimumContent}
+              className="gap-2"
+            >
+              {course.status === 'rejected' ? (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  再申請する
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  審査に提出
+                </>
+              )}
+            </Button>
+          )}
+          
+          {course.status === 'pending_review' && (
+            <div className="flex items-center gap-2 text-yellow-600">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span className="text-sm">審査待ち</span>
+            </div>
+          )}
+          
+          {course.status === 'published' && (
+            <Button variant="outline">
+              非公開にする
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function EditCoursePage() {
@@ -743,17 +891,26 @@ export default function EditCoursePage() {
             <h2 className="text-lg font-semibold">コース設定</h2>
             
             <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 border rounded-lg">
-                <div>
-                  <p className="font-medium">公開ステータス</p>
-                  <p className="text-sm text-muted-foreground">
-                    現在のステータス: {course.status === 'published' ? '公開中' : '下書き'}
-                  </p>
-                </div>
-                <Button variant={course.status === 'published' ? 'outline' : 'default'}>
-                  {course.status === 'published' ? '非公開にする' : '公開申請する'}
-                </Button>
-              </div>
+              {/* 公開ステータス表示 */}
+              <CourseStatusSection 
+                course={course} 
+                onSubmitForReview={async () => {
+                  if (!confirm('このコースを審査に提出しますか？')) return;
+                  
+                  try {
+                    const response = await api.submitCourseForReview(params.id as string);
+                    if (response.success) {
+                      setSuccessMessage('審査に提出しました。審査には通常1-3営業日かかります。');
+                      setTimeout(() => setSuccessMessage(''), 5000);
+                      await loadCourse(params.id as string);
+                    } else {
+                      setError(response.error?.message || '審査申請に失敗しました');
+                    }
+                  } catch {
+                    setError('ネットワークエラーが発生しました');
+                  }
+                }}
+              />
 
               <div className="flex items-center justify-between p-4 border rounded-lg border-destructive/50">
                 <div>
