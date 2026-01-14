@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function SignInPage() {
-  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading, user, getDefaultRedirectPath } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -16,16 +16,18 @@ export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
 
-  // 認証済みの場合はリダイレクト先またはダッシュボードにリダイレクト
+  // 認証済みの場合はロールに応じたページにリダイレクト
   useEffect(() => {
-    if (!authLoading && isAuthenticated && !redirecting) {
+    if (!authLoading && isAuthenticated && user && !redirecting) {
       setRedirecting(true);
       const params = new URLSearchParams(window.location.search);
-      const redirectTo = params.get('redirect') || '/dashboard';
-      console.log('Already authenticated, redirecting to:', redirectTo);
+      const explicitRedirect = params.get('redirect');
+      // 明示的なリダイレクト先があればそれを使用、なければロールに応じたデフォルト
+      const redirectTo = explicitRedirect || getDefaultRedirectPath(user.role);
+      console.log('Already authenticated, redirecting to:', redirectTo, 'role:', user.role);
       window.location.href = redirectTo;
     }
-  }, [authLoading, isAuthenticated, redirecting]);
+  }, [authLoading, isAuthenticated, redirecting, user, getDefaultRedirectPath]);
 
   // 認証チェック中またはリダイレクト中
   if (authLoading || redirecting) {
@@ -46,10 +48,14 @@ export default function SignInPage() {
       const result = await login(email, password);
       console.log('Login result:', result);
       
-      if (result.success) {
-        console.log('Redirecting to dashboard...');
+      if (result.success && result.user) {
+        // ロールに応じたリダイレクト先を決定
+        const params = new URLSearchParams(window.location.search);
+        const explicitRedirect = params.get('redirect');
+        const redirectTo = explicitRedirect || getDefaultRedirectPath(result.user.role);
+        console.log('Login successful, redirecting to:', redirectTo, 'role:', result.user.role);
         // Use window.location for reliable redirect on Cloudflare Pages
-        window.location.href = '/dashboard';
+        window.location.href = redirectTo;
         return; // Don't setIsLoading(false) since we're redirecting
       } else {
         setError(result.error || 'ログインに失敗しました');

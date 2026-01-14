@@ -15,10 +15,11 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
+  register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  getDefaultRedirectPath: (role?: string) => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -84,13 +85,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
+  // ロールに応じたデフォルトリダイレクト先を取得
+  const getDefaultRedirectPath = (role?: string): string => {
+    switch (role) {
+      case 'admin':
+      case 'super_admin':
+        return '/admin';
+      case 'instructor':
+        return '/instructor';
+      case 'student':
+      default:
+        return '/dashboard';
+    }
+  };
+
   const login = async (email: string, password: string) => {
     try {
       const response = await api.login(email, password);
       if (response.success && response.data) {
         api.setToken(response.data.token);
-        setUser(response.data.user);
-        return { success: true };
+        const loggedInUser = response.data.user;
+        setUser(loggedInUser);
+        return { success: true, user: loggedInUser };
       }
       return { 
         success: false, 
@@ -106,8 +122,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await api.register(email, password, name);
       if (response.success && response.data) {
         api.setToken(response.data.token);
-        setUser(response.data.user);
-        return { success: true };
+        const registeredUser = response.data.user;
+        setUser(registeredUser);
+        return { success: true, user: registeredUser };
       }
       return { 
         success: false, 
@@ -133,6 +150,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         refreshUser,
+        getDefaultRedirectPath,
       }}
     >
       {children}
