@@ -30,7 +30,10 @@ import {
   Send,
   CheckCircle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Image,
+  Play,
+  Camera
 } from 'lucide-react';
 
 interface Section {
@@ -65,6 +68,8 @@ interface Course {
   status: string;
   rejectionReason?: string;
   totalLectures?: number;
+  thumbnailUrl?: string;
+  promoVideoUrl?: string;
   sections: Section[];
 }
 
@@ -250,6 +255,21 @@ export default function EditCoursePage() {
   const [videoUpload, setVideoUpload] = useState<{
     lectureId: string;
     sectionId: string;
+    isUploading: boolean;
+    progress: number;
+    error?: string;
+  } | null>(null);
+
+  // Thumbnail upload state
+  const [thumbnailUpload, setThumbnailUpload] = useState<{
+    isUploading: boolean;
+    progress: number;
+    error?: string;
+    preview?: string;
+  } | null>(null);
+
+  // Promo video upload state
+  const [promoVideoUpload, setPromoVideoUpload] = useState<{
     isUploading: boolean;
     progress: number;
     error?: string;
@@ -497,6 +517,119 @@ export default function EditCoursePage() {
     }
   };
 
+  // Thumbnail Upload
+  const handleThumbnailUpload = async (file: File) => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('画像ファイルを選択してください');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('ファイルサイズは5MB以下にしてください');
+      return;
+    }
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setThumbnailUpload({
+        isUploading: true,
+        progress: 0,
+        preview: e.target?.result as string
+      });
+    };
+    reader.readAsDataURL(file);
+
+    try {
+      setThumbnailUpload(prev => prev ? { ...prev, progress: 30 } : { isUploading: true, progress: 30 });
+
+      // Upload to API
+      const response = await api.uploadCourseThumbnail(params.id as string, file);
+
+      if (response.success) {
+        setThumbnailUpload(prev => prev ? { ...prev, progress: 100 } : null);
+        await loadCourse(params.id as string);
+        setTimeout(() => setThumbnailUpload(null), 1000);
+        setSuccessMessage('サムネイルをアップロードしました');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        throw new Error(response.error?.message || 'サムネイルのアップロードに失敗しました');
+      }
+    } catch (err) {
+      setThumbnailUpload(prev => prev ? {
+        ...prev,
+        isUploading: false,
+        error: err instanceof Error ? err.message : 'サムネイルのアップロードに失敗しました'
+      } : null);
+    }
+  };
+
+  const handleRemoveThumbnail = async () => {
+    if (!confirm('サムネイルを削除しますか？')) return;
+
+    try {
+      const response = await api.deleteCourseThumbnail(params.id as string);
+      if (response.success) {
+        await loadCourse(params.id as string);
+        setSuccessMessage('サムネイルを削除しました');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        setError(response.error?.message || 'サムネイルの削除に失敗しました');
+      }
+    } catch {
+      setError('サムネイルの削除に失敗しました');
+    }
+  };
+
+  // Promo Video Upload
+  const handlePromoVideoUpload = async (file: File) => {
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      setError('動画ファイルを選択してください');
+      return;
+    }
+
+    // Validate file size (max 100MB)
+    if (file.size > 100 * 1024 * 1024) {
+      setError('ファイルサイズは100MB以下にしてください');
+      return;
+    }
+
+    setPromoVideoUpload({
+      isUploading: true,
+      progress: 0
+    });
+
+    try {
+      // Simulate progress
+      for (let i = 20; i <= 80; i += 20) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setPromoVideoUpload(prev => prev ? { ...prev, progress: i } : null);
+      }
+
+      // Upload to API
+      const response = await api.uploadPromoVideo(params.id as string, file);
+
+      if (response.success) {
+        setPromoVideoUpload(prev => prev ? { ...prev, progress: 100 } : null);
+        await loadCourse(params.id as string);
+        setTimeout(() => setPromoVideoUpload(null), 1000);
+        setSuccessMessage('プロモーション動画をアップロードしました');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        throw new Error(response.error?.message || 'プロモーション動画のアップロードに失敗しました');
+      }
+    } catch (err) {
+      setPromoVideoUpload(prev => prev ? {
+        ...prev,
+        isUploading: false,
+        error: err instanceof Error ? err.message : 'プロモーション動画のアップロードに失敗しました'
+      } : null);
+    }
+  };
+
   const getVideoStatusBadge = (lecture: Lecture) => {
     if (!lecture.videoId && lecture.contentType === 'video') {
       return (
@@ -672,6 +805,189 @@ export default function EditCoursePage() {
                   ))}
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Thumbnail & Promo Video */}
+          <div className="rounded-xl border bg-card p-6 space-y-6">
+            <h2 className="text-lg font-semibold">メディア</h2>
+            
+            {/* Thumbnail */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Image className="h-4 w-4" />
+                コースサムネイル
+              </label>
+              <p className="text-xs text-muted-foreground">
+                推奨サイズ: 1280x720px (16:9)、最大5MB、JPG/PNG/WEBP形式
+              </p>
+              
+              <div className="flex gap-4 items-start">
+                {/* Thumbnail Preview */}
+                <div className="w-64 aspect-video bg-muted rounded-lg overflow-hidden relative group">
+                  {(thumbnailUpload?.preview || course?.thumbnailUrl) ? (
+                    <>
+                      <img 
+                        src={thumbnailUpload?.preview || course?.thumbnailUrl} 
+                        alt="サムネイル"
+                        className="w-full h-full object-cover"
+                      />
+                      {thumbnailUpload?.isUploading && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <div className="text-center text-white">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                            <span className="text-sm">{thumbnailUpload.progress}%</span>
+                          </div>
+                        </div>
+                      )}
+                      {!thumbnailUpload?.isUploading && course?.thumbnailUrl && (
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <label className="cursor-pointer">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleThumbnailUpload(file);
+                              }}
+                            />
+                            <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-white text-foreground rounded-lg text-sm font-medium hover:bg-gray-100">
+                              <Camera className="h-4 w-4" />
+                              変更
+                            </span>
+                          </label>
+                          <button
+                            onClick={handleRemoveThumbnail}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm font-medium hover:bg-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            削除
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleThumbnailUpload(file);
+                        }}
+                      />
+                      <Image className="h-10 w-10 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">クリックしてアップロード</span>
+                      <span className="text-xs text-muted-foreground mt-1">または画像をドラッグ&ドロップ</span>
+                    </label>
+                  )}
+                </div>
+
+                {/* Upload Tips */}
+                <div className="flex-1 text-sm text-muted-foreground space-y-2">
+                  <p className="font-medium text-foreground">サムネイルのポイント:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>明るく鮮やかな画像が注目を集めます</li>
+                    <li>コースの内容が一目でわかるデザインに</li>
+                    <li>テキストは読みやすく、大きめに</li>
+                    <li>顔が映っていると信頼感が上がります</li>
+                  </ul>
+                </div>
+              </div>
+
+              {thumbnailUpload?.error && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  {thumbnailUpload.error}
+                </div>
+              )}
+            </div>
+
+            {/* Promo Video */}
+            <div className="space-y-3 pt-4 border-t">
+              <label className="text-sm font-medium flex items-center gap-2">
+                <Play className="h-4 w-4" />
+                プロモーション動画
+              </label>
+              <p className="text-xs text-muted-foreground">
+                コースの紹介動画をアップロードしてください。最大100MB、MP4/MOV形式推奨
+              </p>
+
+              <div className="flex gap-4 items-start">
+                {/* Promo Video Preview */}
+                <div className="w-64 aspect-video bg-muted rounded-lg overflow-hidden relative group">
+                  {course?.promoVideoUrl ? (
+                    <>
+                      <video 
+                        src={course.promoVideoUrl}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                        <div className="rounded-full bg-white/90 p-3">
+                          <Play className="h-6 w-6 text-primary fill-primary" />
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="video/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handlePromoVideoUpload(file);
+                            }}
+                          />
+                          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-white text-foreground rounded-lg text-sm font-medium hover:bg-gray-100">
+                            <Upload className="h-4 w-4" />
+                            変更
+                          </span>
+                        </label>
+                      </div>
+                    </>
+                  ) : promoVideoUpload?.isUploading ? (
+                    <div className="w-full h-full flex flex-col items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+                      <span className="text-sm text-muted-foreground">{promoVideoUpload.progress}%</span>
+                    </div>
+                  ) : (
+                    <label className="w-full h-full flex flex-col items-center justify-center cursor-pointer hover:bg-muted/80 transition-colors">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handlePromoVideoUpload(file);
+                        }}
+                      />
+                      <Video className="h-10 w-10 text-muted-foreground mb-2" />
+                      <span className="text-sm text-muted-foreground">クリックしてアップロード</span>
+                      <span className="text-xs text-muted-foreground mt-1">またはファイルをドラッグ&ドロップ</span>
+                    </label>
+                  )}
+                </div>
+
+                {/* Upload Tips */}
+                <div className="flex-1 text-sm text-muted-foreground space-y-2">
+                  <p className="font-medium text-foreground">プロモーション動画のポイント:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>1〜3分程度の長さがおすすめ</li>
+                    <li>コースで何が学べるかを明確に</li>
+                    <li>講師の人柄が伝わる内容に</li>
+                    <li>音声は聞き取りやすく、明瞭に</li>
+                  </ul>
+                </div>
+              </div>
+
+              {promoVideoUpload?.error && (
+                <div className="flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  {promoVideoUpload.error}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -582,6 +582,103 @@ class ApiClient {
     }>(`/v1/videos/playback/${lectureId}`);
   }
 
+  // Images / Thumbnails (Cloudflare R2)
+  async getImageUploadUrl(type: 'thumbnail' | 'avatar' | 'promo') {
+    return this.request<{
+      uploadId: string;
+      uploadUrl: string;
+      publicUrl: string;
+      expiresAt: string;
+    }>(`/v1/images/upload-url?type=${type}`, { method: 'POST' });
+  }
+
+  async uploadCourseThumbnail(courseId: string, file: File) {
+    // For direct upload, we need to use FormData
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('courseId', courseId);
+
+    const currentToken = this.getToken();
+    
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/courses/${courseId}/thumbnail`, {
+        method: 'POST',
+        headers: {
+          ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {}),
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || {
+            code: 'UPLOAD_ERROR',
+            message: data.message || 'アップロードに失敗しました',
+          },
+        };
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'ネットワークエラーが発生しました',
+        },
+      };
+    }
+  }
+
+  async deleteCourseThumbnail(courseId: string) {
+    return this.request<{ deleted: boolean }>(`/v1/courses/${courseId}/thumbnail`, {
+      method: 'DELETE',
+    });
+  }
+
+  async uploadPromoVideo(courseId: string, file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('courseId', courseId);
+
+    const currentToken = this.getToken();
+    
+    try {
+      const response = await fetch(`${this.baseUrl}/v1/courses/${courseId}/promo-video`, {
+        method: 'POST',
+        headers: {
+          ...(currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {}),
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data.error || {
+            code: 'UPLOAD_ERROR',
+            message: data.message || 'アップロードに失敗しました',
+          },
+        };
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          code: 'NETWORK_ERROR',
+          message: 'ネットワークエラーが発生しました',
+        },
+      };
+    }
+  }
+
   // Instructor
   async getInstructorStats() {
     return this.request<{

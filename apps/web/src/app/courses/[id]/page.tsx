@@ -266,10 +266,11 @@ export default function CourseDetailPage() {
 
   const handleEnroll = () => {
     if (!isAuthenticated) {
-      router.push('/sign-in');
+      router.push(`/sign-in?redirect=/checkout?courseId=${params.id}`);
       return;
     }
-    alert('購入機能は実装予定です');
+    // Navigate to checkout page
+    router.push(`/checkout?courseId=${params.id}`);
   };
 
   const totalReviews = Object.values(ratingDistribution).reduce((a, b) => a + b, 0);
