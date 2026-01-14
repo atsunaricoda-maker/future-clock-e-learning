@@ -1,9 +1,12 @@
 'use client';
 
+export const runtime = 'edge';
+
 import { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { api } from '@/lib/api';
 import { ArrowLeft, Mail, Loader2, CheckCircle2 } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
@@ -17,12 +20,15 @@ export default function ForgotPasswordPage() {
     setError('');
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const response = await api.forgotPassword(email);
     
-    // In a real implementation, this would call the password reset API
     setIsLoading(false);
-    setIsSubmitted(true);
+    
+    if (response.success) {
+      setIsSubmitted(true);
+    } else {
+      setError(response.error?.message || 'エラーが発生しました');
+    }
   };
 
   if (isSubmitted) {

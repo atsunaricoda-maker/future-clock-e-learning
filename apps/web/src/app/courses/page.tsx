@@ -1,12 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+export const runtime = 'edge';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Header } from '@/components/layout/header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
-import { Search, Star, Users, Clock, Filter } from 'lucide-react';
+import { Search, Star, Users, Clock, X, SlidersHorizontal } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -31,23 +34,160 @@ interface Course {
   thumbnailUrl?: string;
 }
 
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  courseCount: number;
+}
+
+const LEVELS = [
+  { value: 'all_levels', label: '全レベル' },
+  { value: 'beginner', label: '初級' },
+  { value: 'intermediate', label: '中級' },
+  { value: 'advanced', label: '上級' },
+];
+
+const PRICE_RANGES = [
+  { value: '', label: '全ての価格' },
+  { value: '0-0', label: '無料' },
+  { value: '0-3000', label: '¥3,000以下' },
+  { value: '3000-10000', label: '¥3,000 - ¥10,000' },
+  { value: '10000-', label: '¥10,000以上' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'popular', label: '人気順' },
+  { value: 'newest', label: '新着順' },
+  { value: 'highest_rated', label: '評価の高い順' },
+  { value: 'price_low', label: '価格の低い順' },
+  { value: 'price_high', label: '価格の高い順' },
+];
+
+const RATING_OPTIONS = [
+  { value: '', label: '全ての評価' },
+  { value: '4.5', label: '4.5以上' },
+  { value: '4.0', label: '4.0以上' },
+  { value: '3.5', label: '3.5以上' },
+  { value: '3.0', label: '3.0以上' },
+];
+
 export default function CoursesPage() {
+  const searchParams = useSearchParams();
+  
   const [courses, setCourses] = useState<Course[]>([]);
+  const [filteredCourses, setFilteredCourses] = useState<Course[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get('category') || '');
+  const [selectedLevel, setSelectedLevel] = useState(searchParams.get('level') || '');
+  const [selectedPriceRange, setSelectedPriceRange] = useState(searchParams.get('price') || '');
+  const [selectedRating, setSelectedRating] = useState(searchParams.get('rating') || '');
+  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'popular');
 
   useEffect(() => {
+    loadCategories();
     loadCourses();
   }, []);
 
+  useEffect(() => {
+    applyFilters();
+  }, [courses, searchQuery, selectedCategory, selectedLevel, selectedPriceRange, selectedRating, sortBy]);
+
+  const loadCategories = async () => {
+    const response = await api.getCategories();
+    if (response.success && response.data) {
+      setCategories(response.data.categories);
+    }
+  };
+
   const loadCourses = async () => {
     setIsLoading(true);
-    const response = await api.getCourses();
+    const response = await api.getCourses({ limit: 100 });
     if (response.success && response.data) {
       setCourses(response.data.courses);
     }
     setIsLoading(false);
   };
+
+  const applyFilters = useCallback(() => {
+    let filtered = [...courses];
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (course) =>
+          course.title.toLowerCase().includes(query) ||
+          course.subtitle.toLowerCase().includes(query) ||
+          course.instructor.name.toLowerCase().includes(query)
+      );
+    }
+
+    // Category filter
+    if (selectedCategory) {
+      filtered = filtered.filter((course) => course.category.id === selectedCategory);
+    }
+
+    // Level filter
+    if (selectedLevel) {
+      filtered = filtered.filter((course) => course.level === selectedLevel);
+    }
+
+    // Price range filter
+    if (selectedPriceRange) {
+      const [min, max] = selectedPriceRange.split('-').map(Number);
+      filtered = filtered.filter((course) => {
+        if (max === 0) return course.price === 0; // Free courses
+        if (!max) return course.price >= min; // No upper limit
+        return course.price >= min && course.price <= max;
+      });
+    }
+
+    // Rating filter
+    if (selectedRating) {
+      const minRating = parseFloat(selectedRating);
+      filtered = filtered.filter((course) => course.averageRating >= minRating);
+    }
+
+    // Sort
+    switch (sortBy) {
+      case 'newest':
+        // Assume newer courses have higher IDs (simplified)
+        filtered.sort((a, b) => b.id.localeCompare(a.id));
+        break;
+      case 'highest_rated':
+        filtered.sort((a, b) => b.averageRating - a.averageRating);
+        break;
+      case 'price_low':
+        filtered.sort((a, b) => a.price - b.price);
+        break;
+      case 'price_high':
+        filtered.sort((a, b) => b.price - a.price);
+        break;
+      case 'popular':
+      default:
+        filtered.sort((a, b) => b.totalEnrollments - a.totalEnrollments);
+        break;
+    }
+
+    setFilteredCourses(filtered);
+  }, [courses, searchQuery, selectedCategory, selectedLevel, selectedPriceRange, selectedRating, sortBy]);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedCategory('');
+    setSelectedLevel('');
+    setSelectedPriceRange('');
+    setSelectedRating('');
+    setSortBy('popular');
+  };
+
+  const hasActiveFilters = searchQuery || selectedCategory || selectedLevel || selectedPriceRange || selectedRating;
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -59,6 +199,7 @@ export default function CoursesPage() {
   };
 
   const formatPrice = (price: number, currency: string) => {
+    if (price === 0) return '無料';
     return new Intl.NumberFormat('ja-JP', {
       style: 'currency',
       currency: currency,
@@ -89,20 +230,145 @@ export default function CoursesPage() {
             </p>
             
             {/* Search Bar */}
-            <div className="mt-6 flex gap-4 max-w-2xl">
+            <div className="mt-6 flex gap-4 max-w-3xl">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="コースを検索..."
+                  placeholder="コース名、講師名で検索..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
-              <Button variant="outline" className="gap-2">
-                <Filter className="h-4 w-4" />
+              <Button
+                variant={showFilters ? 'default' : 'outline'}
+                className="gap-2"
+                onClick={() => setShowFilters(!showFilters)}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
                 フィルター
+                {hasActiveFilters && (
+                  <span className="ml-1 bg-primary-foreground text-primary rounded-full px-2 py-0.5 text-xs">
+                    {[selectedCategory, selectedLevel, selectedPriceRange, selectedRating].filter(Boolean).length}
+                  </span>
+                )}
               </Button>
+            </div>
+          </div>
+        </section>
+
+        {/* Filters Panel */}
+        {showFilters && (
+          <section className="border-b py-4 bg-muted/30">
+            <div className="container">
+              <div className="flex flex-wrap gap-4">
+                {/* Category Filter */}
+                <div className="flex-1 min-w-[200px]">
+                  <label className="text-sm font-medium mb-1 block">カテゴリ</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                  >
+                    <option value="">全てのカテゴリ</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name} ({category.courseCount})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Level Filter */}
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-sm font-medium mb-1 block">レベル</label>
+                  <select
+                    value={selectedLevel}
+                    onChange={(e) => setSelectedLevel(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                  >
+                    <option value="">全てのレベル</option>
+                    {LEVELS.map((level) => (
+                      <option key={level.value} value={level.value}>
+                        {level.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Price Filter */}
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-sm font-medium mb-1 block">価格帯</label>
+                  <select
+                    value={selectedPriceRange}
+                    onChange={(e) => setSelectedPriceRange(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                  >
+                    {PRICE_RANGES.map((range) => (
+                      <option key={range.value} value={range.value}>
+                        {range.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Rating Filter */}
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-sm font-medium mb-1 block">評価</label>
+                  <select
+                    value={selectedRating}
+                    onChange={(e) => setSelectedRating(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm bg-background"
+                  >
+                    {RATING_OPTIONS.map((rating) => (
+                      <option key={rating.value} value={rating.value}>
+                        {rating.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Clear Filters */}
+                {hasActiveFilters && (
+                  <div className="flex items-end">
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
+                      <X className="h-4 w-4 mr-1" />
+                      クリア
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Results Header */}
+        <section className="border-b py-4">
+          <div className="container flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {filteredCourses.length}件のコースが見つかりました
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">並び替え:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="border rounded-lg px-3 py-1.5 text-sm bg-background"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </section>
@@ -114,13 +380,22 @@ export default function CoursesPage() {
               <div className="flex items-center justify-center min-h-[400px]">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </div>
-            ) : courses.length === 0 ? (
+            ) : filteredCourses.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-muted-foreground">コースが見つかりませんでした</p>
+                <p className="text-muted-foreground mb-4">
+                  {hasActiveFilters
+                    ? '条件に一致するコースが見つかりませんでした'
+                    : 'コースが見つかりませんでした'}
+                </p>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearFilters}>
+                    フィルターをクリア
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {courses.map((course) => (
+                {filteredCourses.map((course) => (
                   <Link
                     key={course.id}
                     href={`/courses/${course.id}`}
@@ -193,7 +468,7 @@ export default function CoursesPage() {
 
                         {/* Price */}
                         <div className="mt-3 pt-3 border-t">
-                          <span className="text-lg font-bold">
+                          <span className={`text-lg font-bold ${course.price === 0 ? 'text-green-600' : ''}`}>
                             {formatPrice(course.price, course.currency)}
                           </span>
                         </div>

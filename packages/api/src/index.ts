@@ -22,6 +22,12 @@ import { learningTimeRoutes } from './routes/learning-time';
 import { adminRoutes } from './routes/admin';
 import { videosRoutes } from './routes/videos';
 import { instructorRoutes } from './routes/instructor';
+import { reviewsRoutes } from './routes/reviews';
+import { notificationsRoutes } from './routes/notifications';
+import { couponsRoutes } from './routes/coupons';
+import { questionsRoutes } from './routes/questions';
+import { wishlistRoutes } from './routes/wishlist';
+import { emailRoutes } from './routes/email';
 
 // Create Hono app with typed environment
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -93,6 +99,24 @@ api.route('/instructor', instructorRoutes);
 
 // Video routes (Cloudflare Stream)
 api.route('/videos', videosRoutes);
+
+// Reviews routes
+api.route('/reviews', reviewsRoutes);
+
+// Notifications routes
+api.route('/notifications', notificationsRoutes);
+
+// Coupons routes
+api.route('/coupons', couponsRoutes);
+
+// Questions routes (Q&A)
+api.route('/questions', questionsRoutes);
+
+// Wishlist routes
+api.route('/wishlist', wishlistRoutes);
+
+// Email routes (password reset, etc.)
+api.route('/email', emailRoutes);
 
 // Mount API under /v1
 app.route('/v1', api);

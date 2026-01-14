@@ -588,6 +588,313 @@ class ApiClient {
       pagination: any;
     }>(`/v1/instructor/students${query ? `?${query}` : ''}`);
   }
+
+  // Reviews
+  async getCourseReviews(courseId: string, params?: { page?: number; limit?: number; sortBy?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.sortBy) searchParams.set('sortBy', params.sortBy);
+
+    const query = searchParams.toString();
+    return this.request<{
+      reviews: Array<{
+        id: string;
+        rating: number;
+        title: string;
+        content: string;
+        helpfulCount: number;
+        isVerifiedPurchase: boolean;
+        userName: string;
+        avatarUrl: string;
+        createdAt: string;
+      }>;
+      ratingDistribution: Record<number, number>;
+      pagination: any;
+    }>(`/v1/reviews/courses/${courseId}${query ? `?${query}` : ''}`);
+  }
+
+  async getMyReview(courseId: string) {
+    return this.request<{
+      id: string;
+      rating: number;
+      title: string;
+      content: string;
+      createdAt: string;
+      updatedAt: string;
+    } | null>(`/v1/reviews/my/${courseId}`);
+  }
+
+  async createReview(courseId: string, data: { rating: number; title?: string; content?: string }) {
+    return this.request<{ id: string }>(`/v1/reviews/courses/${courseId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateReview(reviewId: string, data: { rating: number; title?: string; content?: string }) {
+    return this.request<any>(`/v1/reviews/${reviewId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteReview(reviewId: string) {
+    return this.request<any>(`/v1/reviews/${reviewId}`, { method: 'DELETE' });
+  }
+
+  async markReviewHelpful(reviewId: string) {
+    return this.request<any>(`/v1/reviews/${reviewId}/helpful`, { method: 'POST' });
+  }
+
+  // Notifications
+  async getNotifications(params?: { page?: number; limit?: number; unreadOnly?: boolean }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.unreadOnly) searchParams.set('unreadOnly', 'true');
+
+    const query = searchParams.toString();
+    return this.request<{
+      notifications: Array<{
+        id: string;
+        type: string;
+        title: string;
+        message: string;
+        link: string;
+        isRead: boolean;
+        createdAt: string;
+      }>;
+      unreadCount: number;
+      pagination: any;
+    }>(`/v1/notifications${query ? `?${query}` : ''}`);
+  }
+
+  async getUnreadCount() {
+    return this.request<{ count: number }>('/v1/notifications/unread-count');
+  }
+
+  async markNotificationRead(notificationId: string) {
+    return this.request<any>(`/v1/notifications/${notificationId}/read`, { method: 'PUT' });
+  }
+
+  async markAllNotificationsRead() {
+    return this.request<any>('/v1/notifications/read-all', { method: 'PUT' });
+  }
+
+  // Coupons
+  async validateCoupon(code: string, courseId?: string) {
+    return this.request<{
+      couponId: string;
+      code: string;
+      discountType: string;
+      discountValue: number;
+      discountAmount: number;
+      description: string;
+      validUntil: string;
+    }>('/v1/coupons/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code, courseId }),
+    });
+  }
+
+  // Questions (Q&A)
+  async getCourseQuestions(courseId: string, params?: { page?: number; limit?: number; lectureId?: string; status?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.lectureId) searchParams.set('lectureId', params.lectureId);
+    if (params?.status) searchParams.set('status', params.status);
+
+    const query = searchParams.toString();
+    return this.request<{
+      questions: Array<{
+        id: string;
+        title: string;
+        content: string;
+        status: string;
+        lectureId: string;
+        lectureTitle: string;
+        userName: string;
+        avatarUrl: string;
+        answerCount: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      pagination: any;
+    }>(`/v1/questions/courses/${courseId}${query ? `?${query}` : ''}`);
+  }
+
+  async getQuestion(questionId: string) {
+    return this.request<{
+      question: {
+        id: string;
+        courseId: string;
+        lectureId: string;
+        lectureTitle: string;
+        title: string;
+        content: string;
+        status: string;
+        userId: string;
+        userName: string;
+        avatarUrl: string;
+        createdAt: string;
+        updatedAt: string;
+      };
+      answers: Array<{
+        id: string;
+        content: string;
+        isAccepted: boolean;
+        isInstructor: boolean;
+        userId: string;
+        userName: string;
+        avatarUrl: string;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+    }>(`/v1/questions/${questionId}`);
+  }
+
+  async createQuestion(data: { courseId: string; lectureId?: string; title: string; content: string }) {
+    return this.request<{ id: string }>('/v1/questions', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createAnswer(questionId: string, content: string) {
+    return this.request<{ id: string }>(`/v1/questions/${questionId}/answers`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async acceptAnswer(questionId: string, answerId: string) {
+    return this.request<any>(`/v1/questions/${questionId}/answers/${answerId}/accept`, { method: 'PUT' });
+  }
+
+  async getMyQuestions(params?: { page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const query = searchParams.toString();
+    return this.request<{
+      questions: Array<{
+        id: string;
+        title: string;
+        status: string;
+        courseId: string;
+        courseTitle: string;
+        answerCount: number;
+        createdAt: string;
+      }>;
+      pagination: any;
+    }>(`/v1/questions/my/list${query ? `?${query}` : ''}`);
+  }
+
+  // Wishlist
+  async getWishlist() {
+    return this.request<{
+      items: Array<{
+        id: string;
+        addedAt: string;
+        course: {
+          id: string;
+          title: string;
+          subtitle: string;
+          slug: string;
+          thumbnailUrl: string;
+          price: number;
+          currency: string;
+          averageRating: number;
+          totalReviews: number;
+          totalEnrollments: number;
+          level: string;
+          instructorName: string;
+        };
+      }>;
+    }>('/v1/wishlist');
+  }
+
+  async addToWishlist(courseId: string) {
+    return this.request<{ id: string }>(`/v1/wishlist/courses/${courseId}`, { method: 'POST' });
+  }
+
+  async removeFromWishlist(courseId: string) {
+    return this.request<any>(`/v1/wishlist/courses/${courseId}`, { method: 'DELETE' });
+  }
+
+  async checkWishlist(courseId: string) {
+    return this.request<{ isInWishlist: boolean }>(`/v1/wishlist/courses/${courseId}/check`);
+  }
+
+  // Coupons
+  async getCoupons(params?: { page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const query = searchParams.toString();
+    return this.request<{
+      coupons: Array<{
+        id: string;
+        code: string;
+        description: string;
+        discountType: 'percentage' | 'fixed';
+        discountValue: number;
+        courseId: string;
+        courseTitle: string;
+        maxUses: number;
+        usedCount: number;
+        isActive: boolean;
+        validFrom: string;
+        validUntil: string;
+        createdAt: string;
+      }>;
+      pagination: any;
+    }>(`/v1/coupons${query ? `?${query}` : ''}`);
+  }
+
+  async createCoupon(data: {
+    code: string;
+    description?: string;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    courseId?: string;
+    maxUses?: number;
+    maxUsesPerUser?: number;
+    validFrom?: string;
+    validUntil?: string;
+  }) {
+    return this.request<{ id: string; code: string }>('/v1/coupons', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deactivateCoupon(couponId: string) {
+    return this.request<any>(`/v1/coupons/${couponId}/deactivate`, { method: 'PUT' });
+  }
+
+  // Password Reset / Email
+  async forgotPassword(email: string) {
+    return this.request<{ message: string }>('/v1/email/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, password: string) {
+    return this.request<{ message: string }>('/v1/email/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  }
+
+  async verifyResetToken(token: string) {
+    return this.request<{ email: string; expiresAt: string }>(`/v1/email/verify-reset-token?token=${token}`);
+  }
 }
 
 export const api = new ApiClient(API_URL);
