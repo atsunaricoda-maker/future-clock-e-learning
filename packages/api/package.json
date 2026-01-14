@@ -1,0 +1,29 @@
+{
+  "name": "@webapp/api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo .wrangler",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "wrangler d1 migrations apply elearning-db --local",
+    "db:migrate:prod": "wrangler d1 migrations apply elearning-db",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@webapp/shared": "*",
+    "@clerk/backend": "^0.38.0",
+    "drizzle-orm": "^0.29.3",
+    "hono": "^3.12.6",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240117.0",
+    "drizzle-kit": "^0.20.13",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.25.0"
+  }
+}
