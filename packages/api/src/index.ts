@@ -29,6 +29,10 @@ app.use(
       if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
         return origin;
       }
+      // Allow Cloudflare Pages domains
+      if (origin.includes('elearning-platform.pages.dev')) {
+        return origin;
+      }
       // Allow production domains
       if (origin.includes('elearning.') || origin.includes('futureclock.')) {
         return origin;
