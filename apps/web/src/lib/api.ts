@@ -127,6 +127,92 @@ class ApiClient {
     return this.request<any>(`/v1/courses/${id}`);
   }
 
+  async createCourse(data: {
+    title: string;
+    subtitle?: string;
+    description?: string;
+    categoryId?: string;
+    level?: string;
+    language?: string;
+    price?: number;
+  }) {
+    return this.request<{ id: string; slug: string }>('/v1/courses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCourse(id: string, data: {
+    title?: string;
+    subtitle?: string;
+    description?: string;
+    categoryId?: string;
+    level?: string;
+    price?: number;
+  }) {
+    return this.request<any>(`/v1/courses/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCourse(id: string) {
+    return this.request<any>(`/v1/courses/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Sections
+  async createSection(courseId: string, data: { title: string; description?: string }) {
+    return this.request<{ id: string }>(`/v1/courses/${courseId}/sections`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateSection(courseId: string, sectionId: string, data: { title?: string; description?: string }) {
+    return this.request<any>(`/v1/courses/${courseId}/sections/${sectionId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteSection(courseId: string, sectionId: string) {
+    return this.request<any>(`/v1/courses/${courseId}/sections/${sectionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Lectures
+  async createLecture(courseId: string, sectionId: string, data: { 
+    title: string; 
+    description?: string;
+    contentType?: string;
+    isFree?: boolean;
+  }) {
+    return this.request<{ id: string }>(`/v1/courses/${courseId}/sections/${sectionId}/lectures`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateLecture(courseId: string, sectionId: string, lectureId: string, data: { 
+    title?: string; 
+    description?: string;
+    isFree?: boolean;
+  }) {
+    return this.request<any>(`/v1/courses/${courseId}/sections/${sectionId}/lectures/${lectureId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteLecture(courseId: string, sectionId: string, lectureId: string) {
+    return this.request<any>(`/v1/courses/${courseId}/sections/${sectionId}/lectures/${lectureId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Categories
   async getCategories() {
     return this.request<{ categories: any[] }>('/v1/categories');

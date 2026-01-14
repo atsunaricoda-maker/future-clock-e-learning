@@ -13,6 +13,8 @@ import { usersRoutes } from './routes/users';
 import { coursesRoutes } from './routes/courses';
 import { categoriesRoutes } from './routes/categories';
 import { healthRoutes } from './routes/health';
+import { sectionsRoutes } from './routes/sections';
+import { lecturesRoutes } from './routes/lectures';
 
 // Create Hono app with typed environment
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -59,6 +61,10 @@ api.route('/auth', authRoutes);
 api.route('/users', usersRoutes);
 api.route('/courses', coursesRoutes);
 api.route('/categories', categoriesRoutes);
+
+// Nested routes for course content
+api.route('/courses/:courseId/sections', sectionsRoutes);
+api.route('/courses/:courseId/sections/:sectionId/lectures', lecturesRoutes);
 
 // Mount API under /v1
 app.route('/v1', api);
