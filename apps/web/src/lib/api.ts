@@ -50,14 +50,19 @@ class ApiClient {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
+    // 毎回最新のトークンを取得
+    const currentToken = this.getToken();
+    
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
     };
 
-    if (this.token) {
-      (headers as Record<string, string>)['Authorization'] = `Bearer ${this.token}`;
+    if (currentToken) {
+      (headers as Record<string, string>)['Authorization'] = `Bearer ${currentToken}`;
     }
+    
+    console.log('API Request:', endpoint, 'Token exists:', !!currentToken);
 
     try {
       const response = await fetch(`${this.baseUrl}${endpoint}`, {

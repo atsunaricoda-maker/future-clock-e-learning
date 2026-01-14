@@ -29,15 +29,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshUser = useCallback(async () => {
     // ブラウザ環境でlocalStorageから直接トークンを読み込む
-    let token = api.getToken();
-    if (!token && typeof window !== 'undefined') {
+    let token: string | null = null;
+    
+    if (typeof window !== 'undefined') {
       token = localStorage.getItem('auth_token');
+      console.log('refreshUser: token from localStorage:', !!token);
       if (token) {
         api.setToken(token);
       }
     }
     
-    console.log('refreshUser called, token exists:', !!token);
+    if (!token) {
+      token = api.getToken();
+    }
+    
+    console.log('refreshUser called, final token exists:', !!token);
     
     if (!token) {
       setUser(null);
@@ -51,15 +57,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data) {
         // APIレスポンスをUserインターフェースに変換
         const userData = response.data;
-        setUser({
+        const newUser = {
           id: userData.id,
           email: userData.email,
           name: userData.profile?.displayName || userData.email,
           role: userData.role,
           avatarUrl: userData.profile?.avatarUrl,
-        });
+        };
+        console.log('Setting user:', newUser);
+        setUser(newUser);
       } else {
-        console.log('getMe failed, clearing token');
+        console.log('getMe failed, clearing token. Response:', response);
         api.setToken(null);
         setUser(null);
       }
@@ -67,9 +75,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('refreshUser error:', error);
       api.setToken(null);
       setUser(null);
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
+    console.log('refreshUser completed, isLoading set to false');
   }, []);
 
   useEffect(() => {

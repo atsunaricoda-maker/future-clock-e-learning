@@ -1,21 +1,37 @@
 'use client';
 
 import { useAuth } from '@/lib/auth';
-import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BookOpen, Clock, Award, TrendingUp } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, isLoading, isAuthenticated } = useAuth();
-  const router = useRouter();
+  const [shouldRedirect, setShouldRedirect] = useState(false);
+
+  console.log('Dashboard render:', { isLoading, isAuthenticated, user: user?.email });
 
   useEffect(() => {
+    // ローディング完了後に認証状態をチェック
+    // localStorageにトークンがある場合はリダイレクトしない（まだ読み込み中の可能性）
     if (!isLoading && !isAuthenticated) {
-      router.push('/sign-in');
+      const hasToken = typeof window !== 'undefined' && localStorage.getItem('auth_token');
+      if (!hasToken) {
+        console.log('Dashboard: No token found, will redirect');
+        setShouldRedirect(true);
+      } else {
+        console.log('Dashboard: Token exists but not authenticated yet, waiting...');
+      }
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated]);
 
-  if (isLoading) {
+  useEffect(() => {
+    if (shouldRedirect) {
+      window.location.href = '/sign-in?redirect=/dashboard';
+    }
+  }, [shouldRedirect]);
+
+  // ローディング中またはリダイレクト待機中は待機
+  if (isLoading || shouldRedirect) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -24,6 +40,15 @@ export default function DashboardPage() {
   }
 
   if (!user) {
+    // トークンがあるがユーザー情報がまだない場合は待機
+    const hasToken = typeof window !== 'undefined' && localStorage.getItem('auth_token');
+    if (hasToken) {
+      return (
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
     return null;
   }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,33 @@ import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function SignInPage() {
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+
+  // 認証済みの場合はリダイレクト先またはダッシュボードにリダイレクト
+  useEffect(() => {
+    if (!authLoading && isAuthenticated && !redirecting) {
+      setRedirecting(true);
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo = params.get('redirect') || '/dashboard';
+      console.log('Already authenticated, redirecting to:', redirectTo);
+      window.location.href = redirectTo;
+    }
+  }, [authLoading, isAuthenticated, redirecting]);
+
+  // 認証チェック中またはリダイレクト中
+  if (authLoading || redirecting) {
+    return (
+      <div className="w-full max-w-md flex items-center justify-center min-h-[300px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
