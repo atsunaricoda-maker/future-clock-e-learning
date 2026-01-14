@@ -60,7 +60,7 @@ interface Section {
 interface Lecture {
   id: string;
   title: string;
-  type: 'video' | 'quiz' | 'document';
+  contentType: 'video' | 'quiz' | 'document';
   duration?: number;
   isFree: boolean;
 }
@@ -164,34 +164,8 @@ export default function CourseDetailPage() {
     );
   }
 
-  // Mock data for sections (since API might not return them yet)
-  const sections: Section[] = course.sections || [
-    {
-      id: 'section-1',
-      title: 'はじめに',
-      lectures: [
-        { id: 'lecture-1', title: 'コース概要', type: 'video', duration: 300, isFree: true },
-        { id: 'lecture-2', title: '環境構築', type: 'video', duration: 600, isFree: true },
-      ],
-    },
-    {
-      id: 'section-2',
-      title: '基礎編',
-      lectures: [
-        { id: 'lecture-3', title: '変数と型', type: 'video', duration: 900, isFree: false },
-        { id: 'lecture-4', title: '制御構文', type: 'video', duration: 1200, isFree: false },
-        { id: 'lecture-5', title: '確認クイズ', type: 'quiz', isFree: false },
-      ],
-    },
-    {
-      id: 'section-3',
-      title: '応用編',
-      lectures: [
-        { id: 'lecture-6', title: 'クラスとオブジェクト', type: 'video', duration: 1500, isFree: false },
-        { id: 'lecture-7', title: '演習資料', type: 'document', isFree: false },
-      ],
-    },
-  ];
+  // Use API sections or fallback to empty
+  const sections: Section[] = course.sections || [];
 
   const whatYouWillLearn = course.whatYouWillLearn || [
     'プログラミングの基礎概念を理解できる',
@@ -369,13 +343,9 @@ export default function CourseDetailPage() {
                                 className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
                               >
                                 <div className="flex items-center gap-3">
-                                  {lecture.type === 'video' && (
+                                  {lecture.contentType === 'video' ? (
                                     <Video className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                  {lecture.type === 'quiz' && (
-                                    <FileText className="h-4 w-4 text-muted-foreground" />
-                                  )}
-                                  {lecture.type === 'document' && (
+                                  ) : (
                                     <FileText className="h-4 w-4 text-muted-foreground" />
                                   )}
                                   <span className="text-sm">{lecture.title}</span>
