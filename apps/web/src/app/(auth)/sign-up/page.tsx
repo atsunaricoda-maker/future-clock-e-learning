@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 
 export default function SignUpPage() {
-  const router = useRouter();
   const { register } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -43,14 +41,20 @@ export default function SignUpPage() {
 
     setIsLoading(true);
 
-    const result = await register(email, password, name);
-    
-    if (result.success) {
-      router.push('/dashboard');
-    } else {
-      setError(result.error || '登録に失敗しました');
+    try {
+      const result = await register(email, password, name);
+      
+      if (result.success) {
+        // Use window.location for reliable redirect on Cloudflare Pages
+        window.location.href = '/dashboard';
+        return;
+      } else {
+        setError(result.error || '登録に失敗しました');
+      }
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('登録処理中にエラーが発生しました');
     }
-    
     setIsLoading(false);
   };
 

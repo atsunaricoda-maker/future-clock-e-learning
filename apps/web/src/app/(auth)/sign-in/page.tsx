@@ -2,14 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function SignInPage() {
-  const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,16 +26,18 @@ export default function SignInPage() {
       console.log('Login result:', result);
       
       if (result.success) {
-        router.push('/dashboard');
+        console.log('Redirecting to dashboard...');
+        // Use window.location for reliable redirect on Cloudflare Pages
+        window.location.href = '/dashboard';
+        return; // Don't setIsLoading(false) since we're redirecting
       } else {
         setError(result.error || 'ログインに失敗しました');
       }
     } catch (err) {
       console.error('Login error:', err);
       setError('ログイン処理中にエラーが発生しました');
-    } finally {
-      setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   return (
