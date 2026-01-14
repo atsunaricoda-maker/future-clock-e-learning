@@ -18,33 +18,36 @@ healthRoutes.get('/', async (c) => {
     checks.database = { status: 'unhealthy' };
   }
 
-  // Check R2 Video Bucket
-  try {
-    const start = Date.now();
-    await c.env.VIDEO_BUCKET.head('_health');
-    checks.videoBucket = {
-      status: 'healthy',
-      latency: Date.now() - start,
-    };
-  } catch (error: any) {
-    // NoSuchKey is expected, bucket is still accessible
-    if (error.message?.includes('NoSuchKey') || error.name === 'R2Error') {
-      checks.videoBucket = { status: 'healthy' };
-    } else {
-      checks.videoBucket = { status: 'unhealthy' };
+  // Check R2 Video Bucket (optional)
+  if (c.env.VIDEO_BUCKET) {
+    try {
+      const start = Date.now();
+      await c.env.VIDEO_BUCKET.head('_health');
+      checks.videoBucket = {
+        status: 'healthy',
+        latency: Date.now() - start,
+      };
+    } catch (error: any) {
+      if (error.message?.includes('NoSuchKey') || error.name === 'R2Error') {
+        checks.videoBucket = { status: 'healthy' };
+      } else {
+        checks.videoBucket = { status: 'unhealthy' };
+      }
     }
   }
 
-  // Check KV Cache
-  try {
-    const start = Date.now();
-    await c.env.CACHE.get('_health');
-    checks.cache = {
-      status: 'healthy',
-      latency: Date.now() - start,
-    };
-  } catch (error) {
-    checks.cache = { status: 'unhealthy' };
+  // Check KV Cache (optional)
+  if (c.env.CACHE) {
+    try {
+      const start = Date.now();
+      await c.env.CACHE.get('_health');
+      checks.cache = {
+        status: 'healthy',
+        latency: Date.now() - start,
+      };
+    } catch (error) {
+      checks.cache = { status: 'unhealthy' };
+    }
   }
 
   const allHealthy = Object.values(checks).every((c) => c.status === 'healthy');

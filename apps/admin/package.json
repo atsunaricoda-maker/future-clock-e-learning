@@ -10,7 +10,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clerk/nextjs": "^4.29.0",
     "@webapp/shared": "*",
     "@webapp/ui": "*",
     "class-variance-authority": "^0.7.0",

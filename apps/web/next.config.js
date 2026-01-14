@@ -1,21 +1,23 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  transpilePackages: ['@elearning/shared'],
+  transpilePackages: ['@webapp/shared', '@webapp/ui'],
+  
   images: {
-    domains: [
-      'img.clerk.com',
-      'images.clerk.dev',
-      // R2 custom domain will be added here
+    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.r2.cloudflarestorage.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.cloudflare.com',
+      },
     ],
   },
-  // For Cloudflare Pages deployment
-  output: 'standalone',
-  experimental: {
-    // Enable if using server actions
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
+  
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787',
   },
 };
 

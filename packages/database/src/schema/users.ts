@@ -1,18 +1,19 @@
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 /**
- * ユーザーテーブル - Clerkと連携
+ * ユーザーテーブル
  * 設計書: データベース設計１.rtf
  */
 export const users = sqliteTable('users', {
-  id: text('id').primaryKey(), // Clerk user_id
+  id: text('id').primaryKey(),
   email: text('email').notNull().unique(),
+  passwordHash: text('password_hash'), // 独自認証用
   role: text('role', { enum: ['student', 'instructor', 'admin', 'super_admin'] })
     .notNull()
     .default('student'),
   status: text('status', { enum: ['active', 'suspended', 'pending', 'deleted'] })
     .notNull()
-    .default('pending'),
+    .default('active'),
   emailVerified: integer('email_verified', { mode: 'boolean' }).default(false),
   createdAt: text('created_at')
     .notNull()

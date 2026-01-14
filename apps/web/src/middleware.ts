@@ -1,33 +1,40 @@
-import { authMiddleware } from '@clerk/nextjs';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-// This example protects all routes including api/trpc routes
-// Please edit this to allow other routes to be public as needed.
-// See https://clerk.com/docs/references/nextjs/auth-middleware for more information about configuring your middleware
-export default authMiddleware({
-  // Routes that can be accessed while signed out
-  publicRoutes: [
-    '/',
-    '/courses',
-    '/courses/(.*)',
-    '/instructors',
-    '/instructors/(.*)',
-    '/categories',
-    '/categories/(.*)',
-    '/pricing',
-    '/business',
-    '/subsidy',
-    '/contact',
-    '/teach',
-    '/about',
-    '/terms',
-    '/privacy',
-    '/api/webhooks/(.*)',
-  ],
-  // Routes that can always be accessed, and have
-  // no authentication information
-  ignoredRoutes: ['/api/webhooks/(.*)'],
-});
+// シンプルな認証ミドルウェア（Clerk不要）
+// 認証が必要なルートを定義
+const protectedRoutes = [
+  '/dashboard',
+  '/my-learning',
+  '/instructor',
+  '/settings',
+];
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  
+  // 認証が必要なルートかチェック
+  const isProtectedRoute = protectedRoutes.some(route => 
+    pathname.startsWith(route)
+  );
+
+  if (isProtectedRoute) {
+    // セッションCookieをチェック
+    const sessionToken = request.cookies.get('session_token');
+    
+    if (!sessionToken) {
+      // 未認証の場合はログインページへリダイレクト
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*|api).*)',
+  ],
 };

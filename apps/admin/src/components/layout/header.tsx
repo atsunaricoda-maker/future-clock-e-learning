@@ -1,7 +1,6 @@
 'use client';
 
-import { UserButton } from '@clerk/nextjs';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, User } from 'lucide-react';
 import { Button, Input } from '@webapp/ui';
 
 export function Header() {
@@ -28,14 +27,9 @@ export function Header() {
           </span>
         </Button>
         
-        <UserButton
-          afterSignOutUrl="/sign-in"
-          appearance={{
-            elements: {
-              avatarBox: 'h-8 w-8',
-            },
-          }}
-        />
+        <Button variant="ghost" size="icon">
+          <User className="h-5 w-5" />
+        </Button>
       </div>
     </header>
   );

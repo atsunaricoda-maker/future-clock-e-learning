@@ -1,6 +1,4 @@
 import type { Metadata } from 'next';
-import { ClerkProvider } from '@clerk/nextjs';
-import { jaJP } from '@clerk/localizations';
 import '@/styles/globals.css';
 
 export const metadata: Metadata = {
@@ -19,12 +17,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <ClerkProvider localization={jaJP}>
-      <html lang="ja" suppressHydrationWarning>
-        <body className="min-h-screen bg-background font-sans antialiased">
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="ja" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans antialiased">
+        {children}
+      </body>
+    </html>
   );
 }

@@ -4,51 +4,30 @@ compatibility_date = "2024-01-14"
 compatibility_flags = ["nodejs_compat"]
 
 [vars]
-ENVIRONMENT = "development"
+ENVIRONMENT = "production"
+JWT_SECRET = "change-this-in-production-use-secrets"
 
 # D1 Database
 [[d1_databases]]
 binding = "DB"
-database_name = "elearning-db"
-database_id = "local-dev-db"  # Replace with actual ID after creation
+database_name = "video-platform-production"
+database_id = "7afcba3b-64fe-47a8-8e68-52ec3b39ec56"
 
-# R2 Bucket for video storage
-[[r2_buckets]]
-binding = "VIDEO_BUCKET"
-bucket_name = "elearning-videos"
+# R2 Buckets are optional for now (Phase 3)
+# [[r2_buckets]]
+# binding = "VIDEO_BUCKET"
+# bucket_name = "elearning-videos"
 
-# R2 Bucket for attachments
-[[r2_buckets]]
-binding = "ATTACHMENT_BUCKET"
-bucket_name = "elearning-attachments"
+# KV is optional for now
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = "xxx"
 
-# KV for caching
-[[kv_namespaces]]
-binding = "CACHE"
-id = "local-cache"  # Replace with actual ID after creation
-
-# Queues for async processing
-[[queues.producers]]
-binding = "VIDEO_QUEUE"
-queue = "video-processing"
-
-[[queues.consumers]]
-queue = "video-processing"
-max_batch_size = 1
-max_batch_timeout = 30
-
-# Durable Objects for real-time features (Phase 2)
-# [[durable_objects.bindings]]
-# name = "LIVE_STREAM"
-# class_name = "LiveStreamDO"
+# Queues are optional for now (Phase 3)
+# [[queues.producers]]
+# binding = "VIDEO_QUEUE"
+# queue = "video-processing"
 
 [dev]
 port = 8787
 local_protocol = "http"
-
-# Environment-specific settings
-[env.staging]
-vars = { ENVIRONMENT = "staging" }
-
-[env.production]
-vars = { ENVIRONMENT = "production" }
