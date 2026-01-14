@@ -85,7 +85,7 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   
   // メール重複チェック
   const existingUser = await c.env.DB.prepare(
-    'SELECT id FROM users WHERE email = ?'
+    'SELECT id FROM el_users WHERE email = ?'
   ).bind(email).first();
   
   if (existingUser) {
@@ -98,13 +98,13 @@ authRoutes.post('/register', zValidator('json', registerSchema), async (c) => {
   
   // ユーザー作成
   await c.env.DB.prepare(
-    `INSERT INTO users (id, email, password_hash, role, status, created_at, updated_at)
+    `INSERT INTO el_users (id, email, password_hash, role, status, created_at, updated_at)
      VALUES (?, ?, ?, 'student', 'active', datetime('now'), datetime('now'))`
   ).bind(userId, email, passwordHash).run();
   
   // プロフィール作成
   await c.env.DB.prepare(
-    `INSERT INTO user_profiles (id, user_id, display_name, created_at, updated_at)
+    `INSERT INTO el_user_profiles (id, user_id, display_name, created_at, updated_at)
      VALUES (?, ?, ?, datetime('now'), datetime('now'))`
   ).bind(profileId, userId, name).run();
   
@@ -136,8 +136,8 @@ authRoutes.post('/login', zValidator('json', loginSchema), async (c) => {
   // ユーザー検索
   const user = await c.env.DB.prepare(
     `SELECT u.id, u.email, u.password_hash, u.role, u.status, up.display_name
-     FROM users u
-     LEFT JOIN user_profiles up ON up.user_id = u.id
+     FROM el_users u
+     LEFT JOIN el_user_profiles up ON up.user_id = u.id
      WHERE u.email = ?`
   ).bind(email).first();
   
@@ -186,8 +186,8 @@ authRoutes.get('/me', requireAuth, async (c) => {
   const user = await c.env.DB.prepare(`
     SELECT u.id, u.email, u.role, u.status, 
            up.first_name, up.last_name, up.display_name, up.avatar_url, up.bio
-    FROM users u
-    LEFT JOIN user_profiles up ON up.user_id = u.id
+    FROM el_users u
+    LEFT JOIN el_user_profiles up ON up.user_id = u.id
     WHERE u.id = ?
   `).bind(authUser.userId).first();
 

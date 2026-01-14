@@ -135,7 +135,7 @@ export async function authMiddleware(
 
     // DBでユーザー確認
     const user = await c.env.DB.prepare(
-      'SELECT id, email, role, status FROM users WHERE id = ?'
+      'SELECT id, email, role, status FROM el_users WHERE id = ?'
     )
       .bind(userId)
       .first();

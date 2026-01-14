@@ -1,4 +1,5 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://elearning-api.atsunari-coda.workers.dev';
+// 本番APIのURL（環境変数が設定されていない場合のフォールバック）
+const API_URL = 'https://elearning-api.atsunari-coda.workers.dev';
 
 interface ApiResponse<T> {
   success: boolean;
