@@ -413,6 +413,33 @@ class ApiClient {
     return this.request<{ courses: any[]; pagination: any }>(`/v1/admin/courses${query ? `?${query}` : ''}`);
   }
 
+  async getAdminEnrollments(params?: { page?: number; limit?: number; courseId?: string; search?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.courseId) searchParams.set('courseId', params.courseId);
+    if (params?.search) searchParams.set('search', params.search);
+
+    const query = searchParams.toString();
+    return this.request<{
+      enrollments: Array<{
+        id: string;
+        userId: string;
+        userEmail: string;
+        userName: string;
+        courseId: string;
+        courseTitle: string;
+        enrolledAt: string;
+        paymentStatus: string;
+        amount: number;
+        currency: string;
+        progressPercent: number;
+        isCompleted: boolean;
+      }>;
+      pagination: any;
+    }>(`/v1/admin/enrollments${query ? `?${query}` : ''}`);
+  }
+
   async approveCourse(courseId: string) {
     return this.request<any>(`/v1/admin/courses/${courseId}/approve`, { method: 'POST' });
   }
