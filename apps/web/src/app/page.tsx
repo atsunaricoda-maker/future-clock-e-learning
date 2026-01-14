@@ -181,8 +181,8 @@ export default function HomePage() {
               <h4 className="font-semibold">講師の方へ</h4>
               <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/teach" className="hover:text-foreground">講師になる</Link></li>
-                <li><Link href="/instructor/guide" className="hover:text-foreground">講師ガイド</Link></li>
-                <li><Link href="/instructor/support" className="hover:text-foreground">サポート</Link></li>
+                <li><Link href="/for-instructors/guide" className="hover:text-foreground">講師ガイド</Link></li>
+                <li><Link href="/for-instructors/support" className="hover:text-foreground">サポート</Link></li>
               </ul>
             </div>
           </div>

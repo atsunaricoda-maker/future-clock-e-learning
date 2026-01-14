@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   description:
     'リスキリング助成金対応のe-Learningプラットフォーム。質の高い学びを、すべての人に。',
   keywords: ['eラーニング', 'リスキリング', '助成金', 'オンライン学習', '動画講座'],
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
