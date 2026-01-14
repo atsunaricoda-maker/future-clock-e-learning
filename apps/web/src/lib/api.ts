@@ -460,6 +460,134 @@ class ApiClient {
       isFree: boolean;
     }>(`/v1/videos/playback/${lectureId}`);
   }
+
+  // Instructor
+  async getInstructorStats() {
+    return this.request<{
+      publishedCourses: number;
+      totalEnrollments: number;
+      monthlyRevenue: number;
+      averageRating: number;
+      newEnrollmentsThisMonth: number;
+    }>('/v1/instructor/stats');
+  }
+
+  async getInstructorCourses(params?: { page?: number; limit?: number; status?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.status) searchParams.set('status', params.status);
+
+    const query = searchParams.toString();
+    return this.request<{ courses: any[]; pagination: any }>(`/v1/instructor/courses${query ? `?${query}` : ''}`);
+  }
+
+  async getInstructorRevenue(params?: { startDate?: string; endDate?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.set('startDate', params.startDate);
+    if (params?.endDate) searchParams.set('endDate', params.endDate);
+
+    const query = searchParams.toString();
+    return this.request<{
+      commissionRate: number;
+      totalEarnings: number;
+      pendingBalance: number;
+      monthly: Array<{
+        month: string;
+        grossRevenue: number;
+        netRevenue: number;
+        transactionCount: number;
+      }>;
+      byCourse: Array<{
+        courseId: string;
+        courseTitle: string;
+        grossRevenue: number;
+        netRevenue: number;
+        salesCount: number;
+      }>;
+    }>(`/v1/instructor/revenue${query ? `?${query}` : ''}`);
+  }
+
+  async getInstructorQuestions(params?: { page?: number; limit?: number; status?: string; courseId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.status) searchParams.set('status', params.status);
+    if (params?.courseId) searchParams.set('courseId', params.courseId);
+
+    const query = searchParams.toString();
+    return this.request<{
+      questions: Array<{
+        id: string;
+        title: string;
+        content: string;
+        status: string;
+        courseId: string;
+        courseTitle: string;
+        userName: string;
+        answerCount: number;
+        createdAt: string;
+        updatedAt: string;
+      }>;
+      pagination: any;
+    }>(`/v1/instructor/questions${query ? `?${query}` : ''}`);
+  }
+
+  async answerQuestion(questionId: string, content: string) {
+    return this.request<{ id: string; content: string; createdAt: string }>(
+      `/v1/instructor/questions/${questionId}/answer`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ content }),
+      }
+    );
+  }
+
+  async getInstructorAnalytics() {
+    return this.request<{
+      dailyEnrollments: Array<{ date: string; count: number }>;
+      dailyRevenue: Array<{ date: string; revenue: number }>;
+      courseStats: Array<{
+        courseId: string;
+        courseTitle: string;
+        totalEnrollments: number;
+        completedCount: number;
+        averageRating: number;
+        totalReviews: number;
+        totalRevenue: number;
+      }>;
+      recentReviews: Array<{
+        id: string;
+        rating: number;
+        title: string;
+        content: string;
+        courseId: string;
+        courseTitle: string;
+        userName: string;
+        createdAt: string;
+      }>;
+    }>('/v1/instructor/analytics');
+  }
+
+  async getInstructorStudents(params?: { page?: number; limit?: number; courseId?: string }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.courseId) searchParams.set('courseId', params.courseId);
+
+    const query = searchParams.toString();
+    return this.request<{
+      students: Array<{
+        id: string;
+        email: string;
+        displayName: string;
+        enrolledCourses: number;
+        lastEnrollment: string;
+        joinedAt: string;
+      }>;
+      pagination: any;
+    }>(`/v1/instructor/students${query ? `?${query}` : ''}`);
+  }
 }
 
 export const api = new ApiClient(API_URL);

@@ -21,6 +21,7 @@ import { certificatesRoutes } from './routes/certificates';
 import { learningTimeRoutes } from './routes/learning-time';
 import { adminRoutes } from './routes/admin';
 import { videosRoutes } from './routes/videos';
+import { instructorRoutes } from './routes/instructor';
 
 // Create Hono app with typed environment
 const app = new Hono<{ Bindings: Env; Variables: Variables }>();
@@ -86,6 +87,9 @@ api.route('/learning-time', learningTimeRoutes);
 
 // Admin routes
 api.route('/admin', adminRoutes);
+
+// Instructor routes
+api.route('/instructor', instructorRoutes);
 
 // Video routes (Cloudflare Stream)
 api.route('/videos', videosRoutes);
