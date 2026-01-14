@@ -28,7 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const refreshUser = useCallback(async () => {
-    const token = api.getToken();
+    // ブラウザ環境でlocalStorageから直接トークンを読み込む
+    let token = api.getToken();
+    if (!token && typeof window !== 'undefined') {
+      token = localStorage.getItem('auth_token');
+      if (token) {
+        api.setToken(token);
+      }
+    }
+    
+    console.log('refreshUser called, token exists:', !!token);
+    
     if (!token) {
       setUser(null);
       setIsLoading(false);
@@ -37,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await api.getMe();
+      console.log('getMe response:', response);
       if (response.success && response.data) {
         // APIレスポンスをUserインターフェースに変換
         const userData = response.data;
@@ -48,10 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           avatarUrl: userData.profile?.avatarUrl,
         });
       } else {
+        console.log('getMe failed, clearing token');
         api.setToken(null);
         setUser(null);
       }
     } catch (error) {
+      console.error('refreshUser error:', error);
       api.setToken(null);
       setUser(null);
     } finally {

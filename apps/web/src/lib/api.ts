@@ -17,6 +17,11 @@ class ApiClient {
 
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+    // 初期化時にlocalStorageからトークンを読み込み（ブラウザ環境のみ）
+    this.loadTokenFromStorage();
+  }
+
+  private loadTokenFromStorage() {
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
     }
@@ -34,6 +39,10 @@ class ApiClient {
   }
 
   getToken() {
+    // 毎回localStorageから最新のトークンを取得（SSR対応）
+    if (typeof window !== 'undefined' && !this.token) {
+      this.token = localStorage.getItem('auth_token');
+    }
     return this.token;
   }
 
