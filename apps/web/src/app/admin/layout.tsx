@@ -8,7 +8,6 @@ import {
   Shield, 
   Users, 
   BookOpen, 
-  DollarSign, 
   Settings, 
   FileCheck,
   ShoppingCart,
@@ -18,6 +17,8 @@ import {
   Loader2,
   LogOut,
   ChevronRight,
+  Wallet,
+  BarChart3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -27,7 +28,8 @@ const sidebarItems = [
   { href: '/admin/courses', label: 'コース管理', icon: BookOpen },
   { href: '/admin/course-reviews', label: 'コース審査', icon: FileCheck },
   { href: '/admin/enrollments', label: '受講登録', icon: ShoppingCart },
-  { href: '/admin/revenue', label: '収益レポート', icon: DollarSign },
+  { href: '/admin/payouts', label: '講師収益分配', icon: Wallet },
+  { href: '/admin/revenue', label: '収益レポート', icon: BarChart3 },
   { href: '/admin/settings', label: 'システム設定', icon: Settings },
 ];
 

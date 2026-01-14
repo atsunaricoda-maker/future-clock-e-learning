@@ -403,6 +403,88 @@ class ApiClient {
     });
   }
 
+  async updateUserRole(userId: string, role: string) {
+    return this.request<any>(`/v1/admin/users/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  // Instructor Payouts (Admin)
+  async getAdminInstructorPayouts(params?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string;
+    hasPendingPayout?: boolean;
+  }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.hasPendingPayout) searchParams.set('hasPendingPayout', 'true');
+
+    const query = searchParams.toString();
+    return this.request<{
+      instructors: Array<{
+        id: string;
+        instructorId: string;
+        instructorName: string;
+        instructorEmail: string;
+        totalSales: number;
+        platformFee: number;
+        commissionRate: number;
+        netPayout: number;
+        pendingBalance: number;
+        paidAmount: number;
+        lastPayoutDate: string | null;
+        payoutStatus: string;
+      }>;
+      pagination: any;
+      summary?: {
+        totalPendingPayouts: number;
+        totalPaidThisMonth: number;
+        totalInstructors: number;
+        averageCommissionRate: number;
+      };
+    }>(`/v1/admin/instructor-payouts${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminPayoutHistory(params?: { page?: number; limit?: number }) {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', params.page.toString());
+    if (params?.limit) searchParams.set('limit', params.limit.toString());
+
+    const query = searchParams.toString();
+    return this.request<{
+      payouts: Array<{
+        id: string;
+        instructorId: string;
+        instructorName: string;
+        amount: number;
+        status: string;
+        payoutDate: string;
+        processedAt: string | null;
+        transactionId: string | null;
+        note: string | null;
+      }>;
+      pagination: any;
+    }>(`/v1/admin/payout-history${query ? `?${query}` : ''}`);
+  }
+
+  async processInstructorPayout(instructorId: string, data: { amount: number; note?: string }) {
+    return this.request<{ payoutId: string; status: string }>(`/v1/admin/instructors/${instructorId}/payout`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateInstructorCommissionRate(instructorId: string, data: { commissionRate: number }) {
+    return this.request<any>(`/v1/admin/instructors/${instructorId}/commission-rate`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getAdminCourses(params?: { page?: number; limit?: number; status?: string }) {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set('page', params.page.toString());
