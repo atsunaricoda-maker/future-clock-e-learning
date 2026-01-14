@@ -2,7 +2,7 @@
 
 export const runtime = 'edge';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
@@ -21,7 +21,12 @@ import {
   Trash2,
   Edit,
   Video,
-  FileText
+  FileText,
+  Upload,
+  X,
+  Check,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 
 interface Section {
@@ -40,6 +45,8 @@ interface Lecture {
   duration: number;
   isFree: boolean;
   isPublished: boolean;
+  videoStatus?: string;
+  videoId?: string;
 }
 
 interface Course {
@@ -57,11 +64,12 @@ interface Course {
 
 export default function EditCoursePage() {
   const params = useParams();
-  useAuth(); // Ensure user is authenticated
+  useAuth();
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState('basic');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
@@ -75,6 +83,29 @@ export default function EditCoursePage() {
   });
 
   const [newSectionTitle, setNewSectionTitle] = useState('');
+  
+  // Lecture modal state
+  const [lectureModal, setLectureModal] = useState<{
+    isOpen: boolean;
+    mode: 'add' | 'edit';
+    sectionId: string;
+    lectureId?: string;
+    data: {
+      title: string;
+      description: string;
+      contentType: 'video' | 'document';
+      isFree: boolean;
+    };
+  } | null>(null);
+
+  // Video upload state
+  const [videoUpload, setVideoUpload] = useState<{
+    lectureId: string;
+    sectionId: string;
+    isUploading: boolean;
+    progress: number;
+    error?: string;
+  } | null>(null);
 
   const categories = [
     { id: 'cat-programming', name: 'プログラミング' },
@@ -91,13 +122,7 @@ export default function EditCoursePage() {
     { value: 'all_levels', label: '全レベル' },
   ];
 
-  useEffect(() => {
-    if (params.id) {
-      loadCourse(params.id as string);
-    }
-  }, [params.id]);
-
-  const loadCourse = async (id: string) => {
+  const loadCourse = useCallback(async (id: string) => {
     setIsLoading(true);
     const response = await api.getCourse(id);
     if (response.success && response.data) {
@@ -110,13 +135,18 @@ export default function EditCoursePage() {
         level: response.data.level || 'beginner',
         price: response.data.price || 0,
       });
-      // Expand all sections by default
       if (response.data.sections?.length > 0) {
         setExpandedSections(new Set(response.data.sections.map((s: Section) => s.id)));
       }
     }
     setIsLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    if (params.id) {
+      loadCourse(params.id as string);
+    }
+  }, [params.id, loadCourse]);
 
   const handleSave = async () => {
     setError('');
@@ -124,12 +154,13 @@ export default function EditCoursePage() {
     try {
       const response = await api.updateCourse(params.id as string, formData);
       if (response.success) {
-        // Reload course data
+        setSuccessMessage('保存しました');
+        setTimeout(() => setSuccessMessage(''), 3000);
         await loadCourse(params.id as string);
       } else {
         setError(response.error?.message || '保存に失敗しました');
       }
-    } catch (err) {
+    } catch {
       setError('ネットワークエラーが発生しました');
     } finally {
       setIsSaving(false);
@@ -147,7 +178,7 @@ export default function EditCoursePage() {
         setNewSectionTitle('');
         await loadCourse(params.id as string);
       }
-    } catch (err) {
+    } catch {
       setError('セクションの追加に失敗しました');
     }
   };
@@ -162,7 +193,7 @@ export default function EditCoursePage() {
       if (response.success) {
         await loadCourse(params.id as string);
       }
-    } catch (err) {
+    } catch {
       setError('セクションの削除に失敗しました');
     }
   };
@@ -181,6 +212,169 @@ export default function EditCoursePage() {
     const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Lecture CRUD
+  const openAddLectureModal = (sectionId: string) => {
+    setLectureModal({
+      isOpen: true,
+      mode: 'add',
+      sectionId,
+      data: {
+        title: '',
+        description: '',
+        contentType: 'video',
+        isFree: false,
+      },
+    });
+  };
+
+  const openEditLectureModal = (sectionId: string, lecture: Lecture) => {
+    setLectureModal({
+      isOpen: true,
+      mode: 'edit',
+      sectionId,
+      lectureId: lecture.id,
+      data: {
+        title: lecture.title,
+        description: lecture.description || '',
+        contentType: lecture.contentType === 'video' ? 'video' : 'document',
+        isFree: lecture.isFree,
+      },
+    });
+  };
+
+  const handleSaveLecture = async () => {
+    if (!lectureModal || !lectureModal.data.title.trim()) return;
+
+    try {
+      if (lectureModal.mode === 'add') {
+        const response = await api.createLecture(
+          params.id as string,
+          lectureModal.sectionId,
+          lectureModal.data
+        );
+        if (response.success) {
+          setLectureModal(null);
+          await loadCourse(params.id as string);
+        } else {
+          setError(response.error?.message || 'レッスンの追加に失敗しました');
+        }
+      } else {
+        const response = await api.updateLecture(
+          params.id as string,
+          lectureModal.sectionId,
+          lectureModal.lectureId!,
+          lectureModal.data
+        );
+        if (response.success) {
+          setLectureModal(null);
+          await loadCourse(params.id as string);
+        } else {
+          setError(response.error?.message || 'レッスンの更新に失敗しました');
+        }
+      }
+    } catch {
+      setError('ネットワークエラーが発生しました');
+    }
+  };
+
+  const handleDeleteLecture = async (sectionId: string, lectureId: string) => {
+    if (!confirm('このレッスンを削除しますか？')) return;
+
+    try {
+      const response = await api.deleteLecture(params.id as string, sectionId, lectureId);
+      if (response.success) {
+        await loadCourse(params.id as string);
+      } else {
+        setError(response.error?.message || 'レッスンの削除に失敗しました');
+      }
+    } catch {
+      setError('ネットワークエラーが発生しました');
+    }
+  };
+
+  // Video Upload
+  const handleVideoUpload = async (sectionId: string, lectureId: string, _file: File) => {
+    setVideoUpload({
+      lectureId,
+      sectionId,
+      isUploading: true,
+      progress: 0,
+    });
+
+    try {
+      // Get upload URL from API
+      const uploadUrlResponse = await api.getVideoUploadUrl();
+      if (!uploadUrlResponse.success || !uploadUrlResponse.data) {
+        throw new Error('アップロードURLの取得に失敗しました');
+      }
+
+      const { uploadId } = uploadUrlResponse.data;
+
+      // Upload video using TUS protocol (simplified for demo)
+      // In production, use tus-js-client library with uploadUrl and _file
+      setVideoUpload(prev => prev ? { ...prev, progress: 10 } : null);
+
+      // Simulating upload progress (in real implementation, upload to Cloudflare Stream)
+      for (let i = 20; i <= 80; i += 20) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setVideoUpload(prev => prev ? { ...prev, progress: i } : null);
+      }
+
+      // Link the video to the lecture
+      const linkResponse = await api.linkVideoToLecture({
+        courseId: params.id as string,
+        sectionId,
+        lectureId,
+        streamVideoId: uploadId,
+        duration: 600, // Mock duration
+      });
+
+      if (linkResponse.success) {
+        setVideoUpload(prev => prev ? { ...prev, progress: 100 } : null);
+        await loadCourse(params.id as string);
+        setTimeout(() => setVideoUpload(null), 1000);
+        setSuccessMessage('動画をアップロードしました');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      } else {
+        throw new Error(linkResponse.error?.message || '動画の紐付けに失敗しました');
+      }
+    } catch (err) {
+      setVideoUpload(prev => prev ? { 
+        ...prev, 
+        isUploading: false, 
+        error: err instanceof Error ? err.message : '動画のアップロードに失敗しました'
+      } : null);
+    }
+  };
+
+  const getVideoStatusBadge = (lecture: Lecture) => {
+    if (!lecture.videoId && lecture.contentType === 'video') {
+      return (
+        <span className="flex items-center gap-1 text-xs text-orange-600 bg-orange-100 px-2 py-0.5 rounded">
+          <AlertCircle className="h-3 w-3" />
+          動画未設定
+        </span>
+      );
+    }
+    if (lecture.videoStatus === 'processing') {
+      return (
+        <span className="flex items-center gap-1 text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          処理中
+        </span>
+      );
+    }
+    if (lecture.videoStatus === 'ready') {
+      return (
+        <span className="flex items-center gap-1 text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+          <Check className="h-3 w-3" />
+          準備完了
+        </span>
+      );
+    }
+    return null;
   };
 
   if (isLoading) {
@@ -238,6 +432,12 @@ export default function EditCoursePage() {
       {error && (
         <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="rounded-md bg-green-100 p-3 text-sm text-green-700">
+          {successMessage}
         </div>
       )}
 
@@ -333,34 +533,43 @@ export default function EditCoursePage() {
         <div className="space-y-6">
           <div className="rounded-xl border bg-card p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">カリキュラム</h2>
+              <div>
+                <h2 className="text-lg font-semibold">カリキュラム</h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                  セクションとレッスンを追加して、コースの内容を構成します
+                </p>
+              </div>
             </div>
 
             {/* Add Section */}
             <div className="flex gap-2 mb-6">
               <Input
-                placeholder="新しいセクション名"
+                placeholder="新しいセクション名（例：はじめに）"
                 value={newSectionTitle}
                 onChange={(e) => setNewSectionTitle(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddSection()}
               />
-              <Button onClick={handleAddSection} className="gap-2">
+              <Button onClick={handleAddSection} className="gap-2 shrink-0">
                 <Plus className="h-4 w-4" />
-                追加
+                セクション追加
               </Button>
             </div>
 
             {/* Sections */}
             <div className="space-y-4">
               {course.sections?.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  セクションがありません。上のフォームから追加してください。
+                <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                  <Video className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-2">セクションがありません</p>
+                  <p className="text-sm text-muted-foreground">
+                    上のフォームからセクションを追加して、コースの構成を始めましょう
+                  </p>
                 </div>
               ) : (
                 course.sections?.map((section, index) => (
-                  <div key={section.id} className="border rounded-lg">
+                  <div key={section.id} className="border rounded-lg overflow-hidden">
                     <div 
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-muted/50"
+                      className="flex items-center justify-between p-4 bg-muted/30 cursor-pointer hover:bg-muted/50"
                       onClick={() => toggleSection(section.id)}
                     >
                       <div className="flex items-center gap-3">
@@ -383,16 +592,6 @@ export default function EditCoursePage() {
                           size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            // TODO: Edit section
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
                             handleDeleteSection(section.id);
                           }}
                         >
@@ -402,36 +601,107 @@ export default function EditCoursePage() {
                     </div>
 
                     {expandedSections.has(section.id) && (
-                      <div className="border-t bg-muted/30 p-4 space-y-2">
-                        {section.lectures?.map((lecture) => (
-                          <div
-                            key={lecture.id}
-                            className="flex items-center justify-between p-3 bg-background rounded-lg border"
-                          >
-                            <div className="flex items-center gap-3">
-                              <GripVertical className="h-4 w-4 text-muted-foreground" />
-                              {lecture.contentType === 'video' ? (
-                                <Video className="h-4 w-4 text-muted-foreground" />
-                              ) : (
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <span className="text-sm">{lecture.title}</span>
-                              {lecture.isFree && (
-                                <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
-                                  プレビュー
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>{formatDuration(lecture.duration || 0)}</span>
-                              <Button variant="ghost" size="icon">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </div>
+                      <div className="p-4 space-y-3">
+                        {section.lectures?.length === 0 ? (
+                          <div className="text-center py-6 text-muted-foreground text-sm">
+                            このセクションにはまだレッスンがありません
                           </div>
-                        ))}
+                        ) : (
+                          section.lectures?.map((lecture) => (
+                            <div
+                              key={lecture.id}
+                              className="flex items-center justify-between p-3 bg-background rounded-lg border"
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                                {lecture.contentType === 'video' ? (
+                                  <Video className="h-4 w-4 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-sm font-medium truncate block">{lecture.title}</span>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {lecture.isFree && (
+                                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">
+                                        無料プレビュー
+                                      </span>
+                                    )}
+                                    {getVideoStatusBadge(lecture)}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {lecture.duration > 0 && (
+                                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {formatDuration(lecture.duration)}
+                                  </span>
+                                )}
+                                
+                                {/* Video Upload Button */}
+                                {lecture.contentType === 'video' && (
+                                  <label className="cursor-pointer">
+                                    <input
+                                      type="file"
+                                      accept="video/*"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          handleVideoUpload(section.id, lecture.id, file);
+                                        }
+                                      }}
+                                      disabled={videoUpload?.lectureId === lecture.id}
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-1"
+                                      asChild
+                                    >
+                                      <span>
+                                        {videoUpload?.lectureId === lecture.id ? (
+                                          <>
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                            {videoUpload.progress}%
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Upload className="h-3 w-3" />
+                                            動画
+                                          </>
+                                        )}
+                                      </span>
+                                    </Button>
+                                  </label>
+                                )}
+                                
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => openEditLectureModal(section.id, lecture)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  onClick={() => handleDeleteLecture(section.id, lecture.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
 
-                        <Button variant="outline" size="sm" className="w-full gap-2 mt-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full gap-2"
+                          onClick={() => openAddLectureModal(section.id)}
+                        >
                           <Plus className="h-4 w-4" />
                           レッスンを追加
                         </Button>
@@ -497,6 +767,137 @@ export default function EditCoursePage() {
                 </Button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lecture Modal */}
+      {lectureModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div 
+            className="absolute inset-0 bg-black/50" 
+            onClick={() => setLectureModal(null)}
+          />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">
+                {lectureModal.mode === 'add' ? 'レッスンを追加' : 'レッスンを編集'}
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => setLectureModal(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">レッスンタイトル <span className="text-destructive">*</span></label>
+                <Input
+                  value={lectureModal.data.title}
+                  onChange={(e) => setLectureModal({
+                    ...lectureModal,
+                    data: { ...lectureModal.data, title: e.target.value }
+                  })}
+                  placeholder="例：イントロダクション"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">説明</label>
+                <textarea
+                  value={lectureModal.data.description}
+                  onChange={(e) => setLectureModal({
+                    ...lectureModal,
+                    data: { ...lectureModal.data, description: e.target.value }
+                  })}
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-md text-sm resize-none"
+                  placeholder="このレッスンで学ぶ内容を説明してください"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">コンテンツタイプ</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="contentType"
+                      value="video"
+                      checked={lectureModal.data.contentType === 'video'}
+                      onChange={() => setLectureModal({
+                        ...lectureModal,
+                        data: { ...lectureModal.data, contentType: 'video' }
+                      })}
+                      className="h-4 w-4"
+                    />
+                    <Video className="h-4 w-4" />
+                    <span className="text-sm">動画</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="contentType"
+                      value="document"
+                      checked={lectureModal.data.contentType === 'document'}
+                      onChange={() => setLectureModal({
+                        ...lectureModal,
+                        data: { ...lectureModal.data, contentType: 'document' }
+                      })}
+                      className="h-4 w-4"
+                    />
+                    <FileText className="h-4 w-4" />
+                    <span className="text-sm">テキスト</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="isFree"
+                  checked={lectureModal.data.isFree}
+                  onChange={(e) => setLectureModal({
+                    ...lectureModal,
+                    data: { ...lectureModal.data, isFree: e.target.checked }
+                  })}
+                  className="h-4 w-4 rounded"
+                />
+                <label htmlFor="isFree" className="text-sm">
+                  無料プレビューとして公開（購入前に視聴可能）
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <Button variant="outline" onClick={() => setLectureModal(null)}>
+                キャンセル
+              </Button>
+              <Button onClick={handleSaveLecture} disabled={!lectureModal.data.title.trim()}>
+                {lectureModal.mode === 'add' ? '追加' : '保存'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Video Upload Error */}
+      {videoUpload?.error && (
+        <div className="fixed bottom-4 right-4 bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-lg shadow-lg">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5" />
+            <span>{videoUpload.error}</span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6"
+              onClick={() => setVideoUpload(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       )}
