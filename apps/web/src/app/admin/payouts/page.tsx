@@ -914,7 +914,7 @@ export default function AdminPayoutsPage() {
               <Clock className="h-5 w-5 text-yellow-600" />
             </div>
             <div>
-              <p className="text-xl font-bold text-gray-900">¥{summary.totalPendingPayouts.toLocaleString()}</p>
+              <p className="text-xl font-bold text-gray-900">¥{(summary.totalPendingPayouts || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-500">未払い総額</p>
             </div>
           </div>
@@ -925,7 +925,7 @@ export default function AdminPayoutsPage() {
               <ShoppingCart className="h-5 w-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xl font-bold text-gray-900">¥{summary.ppvTotalPending.toLocaleString()}</p>
+              <p className="text-xl font-bold text-gray-900">¥{(summary.ppvTotalPending || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-500">PPV ({summary.ppvTransactionCount}件)</p>
             </div>
           </div>
@@ -936,7 +936,7 @@ export default function AdminPayoutsPage() {
               <Package className="h-5 w-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-xl font-bold text-gray-900">¥{summary.packageTotalPending.toLocaleString()}</p>
+              <p className="text-xl font-bold text-gray-900">¥{(summary.packageTotalPending || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-500">パッケージ ({summary.packageTransactionCount}件)</p>
             </div>
           </div>
@@ -947,7 +947,7 @@ export default function AdminPayoutsPage() {
               <CreditCard className="h-5 w-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-xl font-bold text-gray-900">¥{summary.subscriptionTotalPending.toLocaleString()}</p>
+              <p className="text-xl font-bold text-gray-900">¥{(summary.subscriptionTotalPending || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-500">サブスク ({summary.subscriptionInstructorCount}名)</p>
             </div>
           </div>
@@ -958,7 +958,7 @@ export default function AdminPayoutsPage() {
               <CheckCircle className="h-5 w-5 text-green-600" />
             </div>
             <div>
-              <p className="text-xl font-bold text-gray-900">¥{summary.totalPaidThisMonth.toLocaleString()}</p>
+              <p className="text-xl font-bold text-gray-900">¥{(summary.totalPaidThisMonth || 0).toLocaleString()}</p>
               <p className="text-xs text-gray-500">今月の支払い</p>
             </div>
           </div>
@@ -1065,19 +1065,19 @@ export default function AdminPayoutsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <p className="text-sm text-gray-900">¥{instructor.ppvTotalSales.toLocaleString()}</p>
+                            <p className="text-sm text-gray-900">¥{(instructor.ppvTotalSales || 0).toLocaleString()}</p>
                             <p className="text-xs text-gray-500">{instructor.ppvTransactionCount}件</p>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <p className="text-sm text-gray-900">¥{instructor.packageTotalSales.toLocaleString()}</p>
+                            <p className="text-sm text-gray-900">¥{(instructor.packageTotalSales || 0).toLocaleString()}</p>
                             <p className="text-xs text-gray-500">{instructor.packageTransactionCount}件</p>
                           </td>
                           <td className="px-4 py-4 text-right">
-                            <p className="text-sm text-gray-900">¥{instructor.subscriptionShare.toLocaleString()}</p>
+                            <p className="text-sm text-gray-900">¥{(instructor.subscriptionShare || 0).toLocaleString()}</p>
                             <p className="text-xs text-gray-500">{instructor.subscriptionStudentCount}名</p>
                           </td>
                           <td className="px-4 py-4 text-right text-sm text-gray-900">
-                            ¥{instructor.totalSales.toLocaleString()}
+                            ¥{(instructor.totalSales || 0).toLocaleString()}
                           </td>
                           <td className="px-4 py-4 text-right">
                             <button
@@ -1093,7 +1093,7 @@ export default function AdminPayoutsPage() {
                             </button>
                           </td>
                           <td className="px-4 py-4 text-right text-sm font-bold text-orange-600">
-                            ¥{instructor.pendingBalance.toLocaleString()}
+                            ¥{(instructor.pendingBalance || 0).toLocaleString()}
                           </td>
                           <td className="px-4 py-4 text-center">
                             {getStatusBadge(instructor.payoutStatus)}
@@ -1165,11 +1165,11 @@ export default function AdminPayoutsPage() {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">総売上</p>
-                  <p className="text-lg font-bold text-gray-900">¥{ppvTransactions.reduce((sum, t) => sum + t.salePrice, 0).toLocaleString()}</p>
+                  <p className="text-lg font-bold text-gray-900">¥{(ppvTransactions || []).reduce((sum, t) => sum + (t.salePrice || 0), 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">講師取り分合計</p>
-                  <p className="text-lg font-bold text-green-600">¥{ppvTransactions.reduce((sum, t) => sum + t.instructorPayout, 0).toLocaleString()}</p>
+                  <p className="text-lg font-bold text-green-600">¥{(ppvTransactions || []).reduce((sum, t) => sum + (t.instructorPayout || 0), 0).toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">未払い件数</p>
@@ -1217,14 +1217,14 @@ export default function AdminPayoutsPage() {
                                 <p className="text-xs text-purple-600 mt-1">{t.affiliateName}</p>
                               )}
                             </td>
-                            <td className="px-4 py-4 text-right text-sm text-gray-900">¥{t.salePrice.toLocaleString()}</td>
+                            <td className="px-4 py-4 text-right text-sm text-gray-900">¥{(t.salePrice || 0).toLocaleString()}</td>
                             <td className="px-4 py-4 text-right text-sm text-red-600">
-                              -¥{t.platformFee.toLocaleString()}
+                              -¥{(t.platformFee || 0).toLocaleString()}
                               {t.acquisitionSource === 'affiliate' && t.affiliatePayout && (
-                                <p className="text-xs text-purple-600">(AF: -¥{t.affiliatePayout.toLocaleString()})</p>
+                                <p className="text-xs text-purple-600">(AF: -¥{(t.affiliatePayout || 0).toLocaleString()})</p>
                               )}
                             </td>
-                            <td className="px-4 py-4 text-right text-sm font-medium text-green-600">¥{t.instructorPayout.toLocaleString()}</td>
+                            <td className="px-4 py-4 text-right text-sm font-medium text-green-600">¥{(t.instructorPayout || 0).toLocaleString()}</td>
                             <td className="px-4 py-4 text-center">
                               {t.isPaid ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -1311,9 +1311,9 @@ export default function AdminPayoutsPage() {
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-500">販売価格</p>
-                            <p className="text-xl font-bold text-gray-900">¥{pkg.salePrice.toLocaleString()}</p>
+                            <p className="text-xl font-bold text-gray-900">¥{(pkg.salePrice || 0).toLocaleString()}</p>
                             <p className="text-xs text-green-600">
-                              元値 ¥{pkg.originalTotal.toLocaleString()} から {pkg.discount}%OFF
+                              元値 ¥{(pkg.originalTotal || 0).toLocaleString()} から {pkg.discount}%OFF
                             </p>
                           </div>
                         </div>
@@ -1339,20 +1339,20 @@ export default function AdminPayoutsPage() {
                                 <tr key={idx} className="hover:bg-gray-50">
                                   <td className="px-3 py-2 text-gray-900">{course.courseTitle}</td>
                                   <td className="px-3 py-2 text-gray-600">{course.instructorName}</td>
-                                  <td className="px-3 py-2 text-right text-gray-600">¥{course.listPrice.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-right text-gray-600">¥{(course.listPrice || 0).toLocaleString()}</td>
                                   <td className="px-3 py-2 text-right text-blue-600 font-medium">{course.priceRatio.toFixed(1)}%</td>
-                                  <td className="px-3 py-2 text-right text-gray-900">¥{course.allocatedAmount.toLocaleString()}</td>
-                                  <td className="px-3 py-2 text-right text-red-600">-¥{course.platformFee.toLocaleString()}</td>
-                                  <td className="px-3 py-2 text-right font-medium text-green-700 bg-green-50">¥{course.instructorPayout.toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-right text-gray-900">¥{(course.allocatedAmount || 0).toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-right text-red-600">-¥{(course.platformFee || 0).toLocaleString()}</td>
+                                  <td className="px-3 py-2 text-right font-medium text-green-700 bg-green-50">¥{(course.instructorPayout || 0).toLocaleString()}</td>
                                 </tr>
                               ))}
                             </tbody>
                             <tfoot className="bg-gray-100 font-medium">
                               <tr>
                                 <td colSpan={4} className="px-3 py-2 text-right text-gray-700">合計</td>
-                                <td className="px-3 py-2 text-right text-gray-900">¥{pkg.salePrice.toLocaleString()}</td>
-                                <td className="px-3 py-2 text-right text-red-600">-¥{pkg.courses.reduce((s, c) => s + c.platformFee, 0).toLocaleString()}</td>
-                                <td className="px-3 py-2 text-right text-green-700 bg-green-100">¥{pkg.courses.reduce((s, c) => s + c.instructorPayout, 0).toLocaleString()}</td>
+                                <td className="px-3 py-2 text-right text-gray-900">¥{(pkg.salePrice || 0).toLocaleString()}</td>
+                                <td className="px-3 py-2 text-right text-red-600">-¥{(pkg.courses || []).reduce((s, c) => s + (c.platformFee || 0), 0).toLocaleString()}</td>
+                                <td className="px-3 py-2 text-right text-green-700 bg-green-100">¥{(pkg.courses || []).reduce((s, c) => s + (c.instructorPayout || 0), 0).toLocaleString()}</td>
                               </tr>
                             </tfoot>
                           </table>
@@ -1397,10 +1397,10 @@ export default function AdminPayoutsPage() {
                       {payoutHistory.map((p) => (
                         <tr key={p.id} className="hover:bg-gray-50">
                           <td className="px-4 py-4 text-sm font-medium text-gray-900">{p.instructorName}</td>
-                          <td className="px-4 py-4 text-right text-sm font-medium text-green-600">¥{p.amount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right text-sm text-blue-600">¥{p.ppvAmount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right text-sm text-orange-600">¥{p.packageAmount.toLocaleString()}</td>
-                          <td className="px-4 py-4 text-right text-sm text-purple-600">¥{p.subscriptionAmount.toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-sm font-medium text-green-600">¥{(p.amount || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-sm text-blue-600">¥{(p.ppvAmount || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-sm text-orange-600">¥{(p.packageAmount || 0).toLocaleString()}</td>
+                          <td className="px-4 py-4 text-right text-sm text-purple-600">¥{(p.subscriptionAmount || 0).toLocaleString()}</td>
                           <td className="px-4 py-4 text-center">{getStatusBadge(p.status)}</td>
                           <td className="px-4 py-4 text-sm text-gray-500">{new Date(p.payoutDate).toLocaleDateString('ja-JP')}</td>
                           <td className="px-4 py-4 text-sm text-gray-500 font-mono">{p.transactionId || '-'}</td>
@@ -1567,7 +1567,7 @@ export default function AdminPayoutsPage() {
                               <span className="text-2xl font-bold text-green-600">¥{instructorPayout.toLocaleString()}</span>
                             </div>
                             <p className="text-xs text-gray-500 mt-2">
-                              ※最低支払い額: ¥{platformSettings.minimumPayoutAmount.toLocaleString()}以上で支払い実行
+                              ※最低支払い額: ¥{(platformSettings?.minimumPayoutAmount || 0).toLocaleString()}以上で支払い実行
                             </p>
                           </div>
                         );
@@ -1697,7 +1697,7 @@ export default function AdminPayoutsPage() {
                             />
                           </div>
                           <p className="text-sm text-gray-500 mt-2">
-                            定価合計: ¥{packageCalcCourses.reduce((s, c) => s + c.listPrice, 0).toLocaleString()}
+                            定価合計: ¥{(packageCalcCourses || []).reduce((s, c) => s + (c.listPrice || 0), 0).toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -1715,11 +1715,11 @@ export default function AdminPayoutsPage() {
                               <div className="grid grid-cols-3 gap-4 text-center">
                                 <div>
                                   <p className="text-xs text-orange-700">定価合計</p>
-                                  <p className="text-lg font-bold text-orange-900">¥{result.totalListPrice.toLocaleString()}</p>
+                                  <p className="text-lg font-bold text-orange-900">¥{(result.totalListPrice || 0).toLocaleString()}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-orange-700">販売価格</p>
-                                  <p className="text-lg font-bold text-orange-900">¥{result.packagePrice.toLocaleString()}</p>
+                                  <p className="text-lg font-bold text-orange-900">¥{(result.packagePrice || 0).toLocaleString()}</p>
                                 </div>
                                 <div>
                                   <p className="text-xs text-orange-700">割引率</p>
@@ -1749,8 +1749,8 @@ export default function AdminPayoutsPage() {
                                           <p className="text-xs text-gray-500">{d.instructorName}</p>
                                         </td>
                                         <td className="px-3 py-2 text-right text-blue-600">{d.priceRatio.toFixed(1)}%</td>
-                                        <td className="px-3 py-2 text-right">¥{d.allocatedAmount.toLocaleString()}</td>
-                                        <td className="px-3 py-2 text-right font-medium text-green-700 bg-green-50">¥{d.instructorPayout.toLocaleString()}</td>
+                                        <td className="px-3 py-2 text-right">¥{(d.allocatedAmount || 0).toLocaleString()}</td>
+                                        <td className="px-3 py-2 text-right font-medium text-green-700 bg-green-50">¥{(d.instructorPayout || 0).toLocaleString()}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -1769,8 +1769,8 @@ export default function AdminPayoutsPage() {
                                       <p className="text-xs text-gray-500">{inst.courses.length}コース</p>
                                     </div>
                                     <div className="text-right">
-                                      <p className="text-lg font-bold text-green-600">¥{inst.totalPayout.toLocaleString()}</p>
-                                      <p className="text-xs text-gray-500">手数料: -¥{inst.totalFee.toLocaleString()}</p>
+                                      <p className="text-lg font-bold text-green-600">¥{(inst.totalPayout || 0).toLocaleString()}</p>
+                                      <p className="text-xs text-gray-500">手数料: -¥{(inst.totalFee || 0).toLocaleString()}</p>
                                     </div>
                                   </div>
                                 ))}
@@ -1782,11 +1782,11 @@ export default function AdminPayoutsPage() {
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="text-sm text-gray-600">プラットフォーム手数料合計</p>
-                                  <p className="font-medium text-red-600">-¥{result.totalPlatformFee.toLocaleString()}</p>
+                                  <p className="font-medium text-red-600">-¥{(result.totalPlatformFee || 0).toLocaleString()}</p>
                                 </div>
                                 <div className="text-right">
                                   <p className="text-sm text-gray-600">講師への振込合計</p>
-                                  <p className="text-2xl font-bold text-green-600">¥{result.totalInstructorPayout.toLocaleString()}</p>
+                                  <p className="text-2xl font-bold text-green-600">¥{(result.totalInstructorPayout || 0).toLocaleString()}</p>
                                 </div>
                               </div>
                             </div>
@@ -2010,19 +2010,19 @@ export default function AdminPayoutsPage() {
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
                     <span className="text-blue-700">PPV売上分:</span>
-                    <span className="font-medium text-blue-900">¥{Math.floor(selectedInstructor.pendingBalance * 0.5).toLocaleString()}</span>
+                    <span className="font-medium text-blue-900">¥{Math.floor((selectedInstructor?.pendingBalance || 0) * 0.5).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-blue-700">パッケージ分:</span>
-                    <span className="font-medium text-blue-900">¥{Math.floor(selectedInstructor.pendingBalance * 0.2).toLocaleString()}</span>
+                    <span className="font-medium text-blue-900">¥{Math.floor((selectedInstructor?.pendingBalance || 0) * 0.2).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-blue-700">サブスク分配分:</span>
-                    <span className="font-medium text-blue-900">¥{Math.floor(selectedInstructor.pendingBalance * 0.3).toLocaleString()}</span>
+                    <span className="font-medium text-blue-900">¥{Math.floor((selectedInstructor?.pendingBalance || 0) * 0.3).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between border-t border-blue-200 pt-1 mt-1">
                     <span className="text-blue-700">合計:</span>
-                    <span className="font-bold text-blue-900">¥{selectedInstructor.pendingBalance.toLocaleString()}</span>
+                    <span className="font-bold text-blue-900">¥{(selectedInstructor?.pendingBalance || 0).toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -2040,7 +2040,7 @@ export default function AdminPayoutsPage() {
                   />
                 </div>
                 <p className="text-xs text-gray-500">
-                  未払い残高: ¥{selectedInstructor.pendingBalance.toLocaleString()}
+                  未払い残高: ¥{(selectedInstructor?.pendingBalance || 0).toLocaleString()}
                 </p>
               </div>
 
