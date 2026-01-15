@@ -244,23 +244,28 @@ export default function AdminPayoutsPage() {
         hasPendingPayout: activeTab === 'pending' ? true : undefined,
       });
       if (response.success && response.data && response.data.instructors) {
-        setInstructors(response.data.instructors.map(i => ({
-          ...i,
-          totalSales: i.totalSales || 0,
+        setInstructors(response.data.instructors.map((i: any) => ({
+          id: i.id || i.instructorId,
+          instructorId: i.instructorId,
+          instructorName: i.instructorName || 'Unknown',
+          instructorEmail: i.instructorEmail || '',
+          totalSales: i.totalSales || i.totalEarnings || 0,
           platformFee: i.platformFee || 0,
           netPayout: i.netPayout || 0,
           pendingBalance: i.pendingBalance || 0,
           paidAmount: i.paidAmount || 0,
           commissionRate: i.commissionRate || 70,
-          ppvTotalSales: (i.totalSales || 0) * 0.5,
+          payoutStatus: i.payoutStatus || (i.pendingBalance > 0 ? 'pending' : 'none'),
+          lastPayoutDate: i.lastPayoutDate || null,
+          ppvTotalSales: (i.totalSales || i.totalEarnings || 0) * 0.5,
           ppvPlatformFee: (i.platformFee || 0) * 0.5,
           ppvNetPayout: (i.netPayout || 0) * 0.5,
           ppvTransactionCount: Math.floor(Math.random() * 20) + 5,
-          packageTotalSales: (i.totalSales || 0) * 0.2,
+          packageTotalSales: (i.totalSales || i.totalEarnings || 0) * 0.2,
           packagePlatformFee: (i.platformFee || 0) * 0.2,
           packageNetPayout: (i.netPayout || 0) * 0.2,
           packageTransactionCount: Math.floor(Math.random() * 10) + 2,
-          subscriptionShare: (i.totalSales || 0) * 0.3,
+          subscriptionShare: (i.totalSales || i.totalEarnings || 0) * 0.3,
           subscriptionStudentCount: Math.floor(Math.random() * 100) + 10,
         })));
         setPagination(prev => ({ ...prev, ...response.data!.pagination }));

@@ -242,9 +242,13 @@ adminRoutes.get('/courses', requireAdmin, async (c) => {
   try {
     let sql = `
       SELECT 
-        c.id, c.title, c.slug, c.status, c.price, c.is_published, c.created_at,
+        c.id, c.title, c.slug, c.subtitle, c.status, c.price, c.currency, c.level,
+        c.is_published, c.created_at, c.updated_at, c.thumbnail_url,
         c.total_enrollments, c.average_rating, c.is_subsidy_eligible,
-        up.display_name as instructor_name, u.email as instructor_email
+        c.instructor_id, c.rejection_reason,
+        up.display_name as instructor_name, u.email as instructor_email,
+        (SELECT COUNT(*) FROM el_lectures l JOIN el_sections s ON l.section_id = s.id WHERE s.course_id = c.id) as total_lectures,
+        (SELECT COALESCE(SUM(l.duration), 0) FROM el_lectures l JOIN el_sections s ON l.section_id = s.id WHERE s.course_id = c.id) as total_duration
       FROM el_courses c
       JOIN el_users u ON c.instructor_id = u.id
       LEFT JOIN el_user_profiles up ON u.id = up.user_id
@@ -275,15 +279,24 @@ adminRoutes.get('/courses', requireAdmin, async (c) => {
         courses: courses.results.map((course: any) => ({
           id: course.id,
           title: course.title,
+          subtitle: course.subtitle,
           slug: course.slug,
           status: course.status,
-          price: course.price,
+          price: course.price || 0,
+          currency: course.currency || 'JPY',
+          level: course.level || 'all_levels',
+          thumbnailUrl: course.thumbnail_url,
           isPublished: !!course.is_published,
-          totalEnrollments: course.total_enrollments,
-          averageRating: course.average_rating,
+          totalEnrollments: course.total_enrollments || 0,
+          totalLectures: course.total_lectures || 0,
+          totalDuration: course.total_duration || 0,
+          averageRating: course.average_rating || 0,
           isSubsidyEligible: !!course.is_subsidy_eligible,
-          instructorName: course.instructor_name,
+          instructorId: course.instructor_id,
+          instructorName: course.instructor_name || 'Unknown',
           instructorEmail: course.instructor_email,
+          rejectionReason: course.rejection_reason,
+          submittedAt: course.updated_at || course.created_at,
           createdAt: course.created_at,
         })),
         pagination: {
@@ -490,9 +503,21 @@ adminRoutes.get('/instructor-payouts', requireAdmin, async (c) => {
     sql += ' ORDER BY ip.pending_balance DESC LIMIT ? OFFSET ?';
     params.push(limit, (page - 1) * limit);
 
-    const [instructors, total] = await Promise.all([
+    // Summary query
+    const summarySql = `
+      SELECT 
+        COALESCE(SUM(pending_balance), 0) as total_pending,
+        COUNT(*) as total_instructors,
+        COALESCE(AVG(commission_rate), 70) as avg_commission
+      FROM el_instructor_profiles ip
+      JOIN el_users u ON ip.user_id = u.id
+      WHERE u.role = 'instructor'
+    `;
+
+    const [instructors, total, summaryResult] = await Promise.all([
       c.env.DB.prepare(sql).bind(...params).all(),
       c.env.DB.prepare(countSql).bind(...countParams).first<{ total: number }>(),
+      c.env.DB.prepare(summarySql).first<{ total_pending: number; total_instructors: number; avg_commission: number }>(),
     ]);
 
     return c.json({
@@ -513,6 +538,12 @@ adminRoutes.get('/instructor-payouts', requireAdmin, async (c) => {
           limit,
           total: total?.total || 0,
           totalPages: Math.ceil((total?.total || 0) / limit),
+        },
+        summary: {
+          totalPendingPayouts: summaryResult?.total_pending || 0,
+          totalPaidThisMonth: 0, // TODO: Calculate from payout history
+          totalInstructors: summaryResult?.total_instructors || 0,
+          averageCommissionRate: Math.round(summaryResult?.avg_commission || 70),
         }
       }
     });
