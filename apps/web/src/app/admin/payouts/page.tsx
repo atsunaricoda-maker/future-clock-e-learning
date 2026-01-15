@@ -243,7 +243,7 @@ export default function AdminPayoutsPage() {
         search: search || undefined,
         hasPendingPayout: activeTab === 'pending' ? true : undefined,
       });
-      if (response.success && response.data) {
+      if (response.success && response.data && response.data.instructors) {
         setInstructors(response.data.instructors.map(i => ({
           ...i,
           ppvTotalSales: i.totalSales * 0.5,
@@ -599,7 +599,7 @@ export default function AdminPayoutsPage() {
         page: pagination.page,
         limit: pagination.limit,
       });
-      if (response.success && response.data) {
+      if (response.success && response.data && response.data.payouts) {
         setPayoutHistory(response.data.payouts.map(p => ({
           ...p,
           ppvAmount: p.amount * 0.5,
