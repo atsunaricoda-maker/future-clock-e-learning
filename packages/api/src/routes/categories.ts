@@ -8,12 +8,14 @@ export const categoriesRoutes = new Hono<{
 
 // Get all categories (hierarchical)
 categoriesRoutes.get('/', async (c) => {
-  const categories = await c.env.DB.prepare(
-    `SELECT c.*, 
-            (SELECT COUNT(*) FROM courses WHERE category_id = c.id AND status = 'published') as course_count
-     FROM categories c
-     ORDER BY c.parent_id NULLS FIRST, c."order" ASC`
-  ).all();
+  try {
+    const categories = await c.env.DB.prepare(
+      `SELECT c.*, 
+              (SELECT COUNT(*) FROM el_courses WHERE category_id = c.id AND status = 'published') as course_count
+       FROM el_categories c
+       WHERE c.is_active = 1
+       ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC`
+    ).all();
 
   // Build hierarchical structure
   const categoryMap = new Map();
@@ -47,19 +49,29 @@ categoriesRoutes.get('/', async (c) => {
 
   return c.json({
     success: true,
-    data: rootCategories,
+    data: {
+      categories: rootCategories,
+    },
   });
+  } catch (error) {
+    console.error('Get categories error:', error);
+    return c.json({
+      success: false,
+      error: { code: 'DATABASE_ERROR', message: 'カテゴリの取得に失敗しました' },
+    }, 500);
+  }
 });
 
 // Get single category with courses
 categoriesRoutes.get('/:slug', async (c) => {
   const slug = c.req.param('slug');
 
-  const category = await c.env.DB.prepare(
-    `SELECT * FROM categories WHERE slug = ?`
-  )
-    .bind(slug)
-    .first();
+  try {
+    const category = await c.env.DB.prepare(
+      `SELECT * FROM el_categories WHERE slug = ? AND is_active = 1`
+    )
+      .bind(slug)
+      .first();
 
   if (!category) {
     return c.json(
@@ -74,10 +86,10 @@ categoriesRoutes.get('/:slug', async (c) => {
   // Get subcategories
   const subcategories = await c.env.DB.prepare(
     `SELECT c.*, 
-            (SELECT COUNT(*) FROM courses WHERE category_id = c.id AND status = 'published') as course_count
-     FROM categories c
-     WHERE c.parent_id = ?
-     ORDER BY c."order" ASC`
+            (SELECT COUNT(*) FROM el_courses WHERE category_id = c.id AND status = 'published') as course_count
+     FROM el_categories c
+     WHERE c.parent_id = ? AND c.is_active = 1
+     ORDER BY c.sort_order ASC`
   )
     .bind(category.id)
     .all();
@@ -89,8 +101,7 @@ categoriesRoutes.get('/:slug', async (c) => {
       name: category.name,
       slug: category.slug,
       description: category.description,
-      icon: category.icon,
-      subcategories: subcategories.results.map((sub) => ({
+      subcategories: subcategories.results.map((sub: any) => ({
         id: sub.id,
         name: sub.name,
         slug: sub.slug,
@@ -98,6 +109,13 @@ categoriesRoutes.get('/:slug', async (c) => {
       })),
     },
   });
+  } catch (error) {
+    console.error('Get category error:', error);
+    return c.json({
+      success: false,
+      error: { code: 'DATABASE_ERROR', message: 'カテゴリの取得に失敗しました' },
+    }, 500);
+  }
 });
 
 // Get courses in category
@@ -108,12 +126,13 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
   const sortBy = c.req.query('sort_by') || 'popular';
   const level = c.req.query('level');
 
-  // Get category
-  const category = await c.env.DB.prepare(
-    `SELECT id FROM categories WHERE slug = ?`
-  )
-    .bind(slug)
-    .first();
+  try {
+    // Get category
+    const category = await c.env.DB.prepare(
+      `SELECT id FROM el_categories WHERE slug = ? AND is_active = 1`
+    )
+      .bind(slug)
+      .first();
 
   if (!category) {
     return c.json(
@@ -128,9 +147,9 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
   // Get all descendant category IDs (for nested categories)
   const categoryIds = await c.env.DB.prepare(
     `WITH RECURSIVE category_tree AS (
-       SELECT id FROM categories WHERE id = ?
+       SELECT id FROM el_categories WHERE id = ?
        UNION ALL
-       SELECT c.id FROM categories c
+       SELECT c.id FROM el_categories c
        JOIN category_tree ct ON c.parent_id = ct.id
      )
      SELECT id FROM category_tree`
@@ -171,7 +190,7 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
 
   // Get total count
   const countResult = await c.env.DB.prepare(
-    `SELECT COUNT(*) as count FROM courses c WHERE ${whereClause}`
+    `SELECT COUNT(*) as count FROM el_courses c WHERE ${whereClause}`
   )
     .bind(...params)
     .first();
@@ -182,14 +201,12 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
   params.push(pageSize, (page - 1) * pageSize);
   const courses = await c.env.DB.prepare(
     `SELECT c.id, c.title, c.slug, c.subtitle, c.thumbnail_url,
-            c.price, c.sale_price, c.level, c.average_rating, c.total_reviews,
-            c.total_enrollments, c.total_duration, c.is_subscription_included,
-            c.is_subsidy_eligible,
-            ip.display_name as instructor_name, ip.user_id as instructor_id,
-            u.avatar_url as instructor_avatar
-     FROM courses c
-     LEFT JOIN instructor_profiles ip ON c.instructor_id = ip.user_id
-     LEFT JOIN users u ON c.instructor_id = u.id
+            c.price, c.discount_price as sale_price, c.level, c.average_rating, c.total_reviews,
+            c.total_enrollments, c.total_duration, c.is_subsidy_eligible,
+            up.display_name as instructor_name, c.instructor_id,
+            up.avatar_url as instructor_avatar
+     FROM el_courses c
+     LEFT JOIN el_user_profiles up ON c.instructor_id = up.user_id
      WHERE ${whereClause}
      ORDER BY ${orderBy}
      LIMIT ? OFFSET ?`
@@ -199,7 +216,7 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
 
   return c.json({
     success: true,
-    data: courses.results.map((course) => ({
+    data: courses.results.map((course: any) => ({
       id: course.id,
       title: course.title,
       slug: course.slug,
@@ -212,7 +229,6 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
       totalReviews: course.total_reviews,
       totalEnrollments: course.total_enrollments,
       totalDuration: course.total_duration,
-      isSubscriptionIncluded: Boolean(course.is_subscription_included),
       isSubsidyEligible: Boolean(course.is_subsidy_eligible),
       instructor: {
         id: course.instructor_id,
@@ -227,4 +243,11 @@ categoriesRoutes.get('/:slug/courses', async (c) => {
       totalCount,
     },
   });
+  } catch (error) {
+    console.error('Get category courses error:', error);
+    return c.json({
+      success: false,
+      error: { code: 'DATABASE_ERROR', message: 'コースの取得に失敗しました' },
+    }, 500);
+  }
 });

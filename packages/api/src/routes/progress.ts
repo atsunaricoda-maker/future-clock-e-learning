@@ -222,7 +222,7 @@ progressRoutes.get('/my-progress', requireAuth, async (c) => {
         e.course_id,
         c.title,
         c.thumbnail_url,
-        e.enrolled_at,
+        e.created_at as enrolled_at,
         (SELECT COUNT(*) FROM el_lectures l JOIN el_sections s ON l.section_id = s.id WHERE s.course_id = c.id) as total_lectures,
         (SELECT COUNT(*) FROM el_lecture_progress lp 
          JOIN el_lectures l ON lp.lecture_id = l.id 
@@ -232,7 +232,7 @@ progressRoutes.get('/my-progress', requireAuth, async (c) => {
       FROM el_enrollments e
       JOIN el_courses c ON e.course_id = c.id
       WHERE e.user_id = ?
-      ORDER BY e.enrolled_at DESC
+      ORDER BY e.created_at DESC
     `).bind(userId).all();
 
     return c.json({
@@ -362,9 +362,9 @@ progressRoutes.post('/courses/:courseId/enroll', requireAuth, async (c) => {
     const enrollmentId = crypto.randomUUID();
 
     await c.env.DB.prepare(`
-      INSERT INTO el_enrollments (id, user_id, course_id, enrolled_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(enrollmentId, userId, courseId, now, now, now).run();
+      INSERT INTO el_enrollments (id, user_id, course_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).bind(enrollmentId, userId, courseId, now, now).run();
 
     return c.json({
       success: true,

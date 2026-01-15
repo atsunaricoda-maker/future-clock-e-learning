@@ -38,6 +38,7 @@ interface VideoItem {
   linkedLecture?: {
     id: string;
     title: string;
+    courseId: string;
     courseTitle: string;
   };
 }
@@ -372,7 +373,7 @@ export default function InstructorVideosPage() {
                   {getStatusBadge(video.status)}
                   {video.linkedLecture ? (
                     <Link 
-                      href={`/instructor/courses/${video.linkedLecture.id}`}
+                      href={`/instructor/courses/${video.linkedLecture.courseId}`}
                       className="text-xs text-primary hover:underline truncate max-w-[150px]"
                     >
                       {video.linkedLecture.courseTitle}

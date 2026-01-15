@@ -57,10 +57,12 @@ export default function CheckoutSuccessPage() {
   const { isAuthenticated, isLoading: authLoading, user } = useAuth();
   
   const courseId = searchParams.get('courseId');
+  const sessionId = searchParams.get('session_id');
   
   const [course, setCourse] = useState<Course | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -70,6 +72,10 @@ export default function CheckoutSuccessPage() {
     
     if (courseId) {
       loadCourse(courseId);
+      // 支払い確認処理
+      if (sessionId && !paymentConfirmed) {
+        confirmPayment(sessionId);
+      }
       // Trigger confetti animation
       setTimeout(() => {
         confetti({
@@ -79,7 +85,20 @@ export default function CheckoutSuccessPage() {
         });
       }, 500);
     }
-  }, [courseId, isAuthenticated, authLoading, router]);
+  }, [courseId, sessionId, isAuthenticated, authLoading, router, paymentConfirmed]);
+
+  const confirmPayment = async (sessionId: string) => {
+    try {
+      const response = await api.confirmPayment(sessionId);
+      if (response.success) {
+        setPaymentConfirmed(true);
+        console.log('Payment confirmed:', response.data);
+      }
+    } catch (err) {
+      // 既に確認済みの場合はエラーを無視
+      console.log('Payment may already be confirmed');
+    }
+  };
 
   const loadCourse = async (id: string) => {
     setIsLoading(true);

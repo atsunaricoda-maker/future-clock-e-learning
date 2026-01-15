@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2, Save, User, Briefcase, CreditCard, Globe, CheckCircle } from 'lucide-react';
+import { Loader2, Save, User, Briefcase, CreditCard, Globe, CheckCircle, Building2 } from 'lucide-react';
 
 interface Profile {
   displayName: string | null;
@@ -15,6 +15,14 @@ interface Profile {
   bio: string | null;
   timezone: string | null;
   language: string | null;
+}
+
+interface BankInfo {
+  bankName: string;
+  branchName: string;
+  accountType: 'ordinary' | 'checking'; // 普通 or 当座
+  accountNumber: string;
+  accountHolder: string;
 }
 
 interface InstructorProfile {
@@ -27,6 +35,7 @@ interface InstructorProfile {
   commissionRate: number;
   totalEarnings: number;
   pendingBalance: number;
+  bankInfo: BankInfo | null;
 }
 
 export default function InstructorSettingsPage() {
@@ -56,6 +65,15 @@ export default function InstructorSettingsPage() {
     commissionRate: 70,
     totalEarnings: 0,
     pendingBalance: 0,
+    bankInfo: null,
+  });
+
+  const [bankInfo, setBankInfo] = useState<BankInfo>({
+    bankName: '',
+    branchName: '',
+    accountType: 'ordinary',
+    accountNumber: '',
+    accountHolder: '',
   });
 
   useEffect(() => {
@@ -74,6 +92,9 @@ export default function InstructorSettingsPage() {
         }
         if (response.data.instructorProfile) {
           setInstructorProfile(prev => ({ ...prev, ...response.data!.instructorProfile }));
+          if (response.data.instructorProfile.bankInfo) {
+            setBankInfo(response.data.instructorProfile.bankInfo);
+          }
         }
       }
     } catch (err) {
@@ -105,6 +126,7 @@ export default function InstructorSettingsPage() {
           experience: instructorProfile.experience,
           socialLinks: instructorProfile.socialLinks,
           website: instructorProfile.website,
+          bankInfo: bankInfo.bankName && bankInfo.accountNumber ? bankInfo : null,
         },
       });
 
@@ -358,10 +380,94 @@ export default function InstructorSettingsPage() {
           ) : (
             <>
               <CreditCard className="h-5 w-5" />
-              <span>銀行口座情報を設定して振込を受け取りましょう（管理者にお問い合わせください）</span>
+              <span>下記の銀行口座情報を設定して振込を受け取りましょう</span>
             </>
           )}
         </div>
+      </div>
+
+      {/* 銀行口座情報 */}
+      <div className="bg-white rounded-xl border p-6 space-y-6">
+        <div className="flex items-center gap-3 border-b pb-4">
+          <div className="bg-indigo-100 p-2 rounded-lg">
+            <Building2 className="h-5 w-5 text-indigo-600" />
+          </div>
+          <div>
+            <h2 className="font-semibold">銀行口座情報</h2>
+            <p className="text-sm text-muted-foreground">収益の振込先口座を設定</p>
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+          <p className="text-sm text-yellow-800">
+            <strong>ご注意:</strong> 振込名義は必ず口座名義人と一致させてください。不一致の場合、振込が行えない場合があります。
+          </p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">金融機関名 <span className="text-red-500">*</span></label>
+            <Input
+              value={bankInfo.bankName}
+              onChange={(e) => setBankInfo(prev => ({ ...prev, bankName: e.target.value }))}
+              placeholder="例: 三菱UFJ銀行"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">支店名 <span className="text-red-500">*</span></label>
+            <Input
+              value={bankInfo.branchName}
+              onChange={(e) => setBankInfo(prev => ({ ...prev, branchName: e.target.value }))}
+              placeholder="例: 渋谷支店"
+            />
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">口座種別 <span className="text-red-500">*</span></label>
+            <select
+              value={bankInfo.accountType}
+              onChange={(e) => setBankInfo(prev => ({ ...prev, accountType: e.target.value as 'ordinary' | 'checking' }))}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <option value="ordinary">普通</option>
+              <option value="checking">当座</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">口座番号 <span className="text-red-500">*</span></label>
+            <Input
+              value={bankInfo.accountNumber}
+              onChange={(e) => setBankInfo(prev => ({ ...prev, accountNumber: e.target.value.replace(/[^0-9]/g, '') }))}
+              placeholder="1234567"
+              maxLength={8}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-medium">口座名義（カタカナ） <span className="text-red-500">*</span></label>
+          <Input
+            value={bankInfo.accountHolder}
+            onChange={(e) => setBankInfo(prev => ({ ...prev, accountHolder: e.target.value }))}
+            placeholder="ヤマダ タロウ"
+          />
+          <p className="text-xs text-muted-foreground">全角カタカナで入力してください（姓と名の間はスペース）</p>
+        </div>
+
+        {bankInfo.bankName && bankInfo.accountNumber && (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <p className="text-sm font-medium mb-2">登録情報の確認</p>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>金融機関: {bankInfo.bankName}</p>
+              <p>支店: {bankInfo.branchName}</p>
+              <p>口座種別: {bankInfo.accountType === 'ordinary' ? '普通' : '当座'}</p>
+              <p>口座番号: {bankInfo.accountNumber}</p>
+              <p>名義人: {bankInfo.accountHolder}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 保存ボタン */}

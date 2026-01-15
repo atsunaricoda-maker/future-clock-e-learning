@@ -22,6 +22,11 @@ export interface Env {
   // Optional secrets
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  
+  // Cloudflare Services
+  CLOUDFLARE_ACCOUNT_ID?: string;
+  CLOUDFLARE_IMAGES_API_TOKEN?: string;
+  CLOUDFLARE_STREAM_API_TOKEN?: string;
 }
 
 // User info from authentication

@@ -282,6 +282,7 @@ coursesRoutes.get('/:id', async (c) => {
         totalDuration: course.total_duration || 0,
         totalLectures: course.total_lectures || 0,
         status: course.status,
+        rejectionReason: course.rejection_reason || null,
         isPublished: course.is_published === 1,
         isSubsidyEligible: course.is_subsidy_eligible === 1,
         subsidyCategory: course.subsidy_category,
@@ -504,18 +505,372 @@ coursesRoutes.post(
     const db = c.env.DB;
 
     try {
+      // 再申請時は rejection_reason をクリア
       await db.prepare(`
-        UPDATE el_courses SET status = 'pending_review', updated_at = datetime('now') WHERE id = ?
+        UPDATE el_courses SET status = 'pending_review', rejection_reason = NULL, updated_at = datetime('now') WHERE id = ?
       `).bind(id).run();
 
       return c.json({
         success: true,
+        data: {
+          courseId: id,
+          status: 'pending_review',
+          submittedAt: new Date().toISOString(),
+        },
         message: 'コースが審査待ちになりました',
       });
     } catch (error) {
       return c.json({
         success: false,
         error: { code: 'DATABASE_ERROR', message: '操作に失敗しました' },
+      }, 500);
+    }
+  }
+);
+
+// POST /courses/:id/thumbnail - Upload course thumbnail
+coursesRoutes.post(
+  '/:id/thumbnail',
+  requireAuth,
+  requireRole(['instructor', 'admin']),
+  async (c) => {
+    const id = c.req.param('id');
+    const user = c.get('user');
+    const db = c.env.DB;
+
+    try {
+      // Verify ownership
+      const course = await db.prepare(`
+        SELECT instructor_id FROM el_courses WHERE id = ? AND deleted_at IS NULL
+      `).bind(id).first<{ instructor_id: string }>();
+
+      if (!course) {
+        return c.json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'コースが見つかりません' },
+        }, 404);
+      }
+
+      if (course.instructor_id !== user!.userId && user!.role !== 'admin') {
+        return c.json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: '権限がありません' },
+        }, 403);
+      }
+
+      // Parse form data
+      const formData = await c.req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return c.json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'ファイルが必要です' },
+        }, 400);
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+      if (!allowedTypes.includes(file.type)) {
+        return c.json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'JPG、PNG、WEBP、GIF形式のみ対応しています' },
+        }, 400);
+      }
+
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        return c.json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'ファイルサイズは5MB以下にしてください' },
+        }, 400);
+      }
+
+      // Upload to Cloudflare Images or R2
+      const accountId = c.env.CLOUDFLARE_ACCOUNT_ID;
+      const imagesApiToken = c.env.CLOUDFLARE_IMAGES_API_TOKEN;
+      
+      let thumbnailUrl = '';
+      
+      if (accountId && imagesApiToken) {
+        // Upload to Cloudflare Images
+        const uploadFormData = new FormData();
+        uploadFormData.append('file', file, file.name);
+        
+        const response = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v1`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${imagesApiToken}`,
+            },
+            body: uploadFormData,
+          }
+        );
+        
+        const result = await response.json() as any;
+        
+        if (result.success && result.result) {
+          // Get public URL variant
+          thumbnailUrl = result.result.variants?.[0] || `https://imagedelivery.net/${accountId}/${result.result.id}/public`;
+        } else {
+          throw new Error(result.errors?.[0]?.message || 'Image upload failed');
+        }
+      } else {
+        // Cloudflare Images API not configured - return error
+        return c.json({
+          success: false,
+          error: { code: 'CONFIGURATION_ERROR', message: '画像アップロード機能は現在利用できません。管理者にお問い合わせください。' },
+        }, 503);
+      }
+
+      // Update course thumbnail_url
+      await db.prepare(`
+        UPDATE el_courses SET thumbnail_url = ?, updated_at = datetime('now') WHERE id = ?
+      `).bind(thumbnailUrl, id).run();
+
+      return c.json({
+        success: true,
+        data: {
+          thumbnailUrl,
+        },
+        message: 'サムネイルをアップロードしました',
+      });
+    } catch (error) {
+      console.error('Error uploading thumbnail:', error);
+      return c.json({
+        success: false,
+        error: { code: 'UPLOAD_ERROR', message: 'サムネイルのアップロードに失敗しました' },
+      }, 500);
+    }
+  }
+);
+
+// DELETE /courses/:id/thumbnail - Delete course thumbnail
+coursesRoutes.delete(
+  '/:id/thumbnail',
+  requireAuth,
+  requireRole(['instructor', 'admin']),
+  async (c) => {
+    const id = c.req.param('id');
+    const user = c.get('user');
+    const db = c.env.DB;
+
+    try {
+      const course = await db.prepare(`
+        SELECT instructor_id, thumbnail_url FROM el_courses WHERE id = ? AND deleted_at IS NULL
+      `).bind(id).first<{ instructor_id: string; thumbnail_url: string }>();
+
+      if (!course) {
+        return c.json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'コースが見つかりません' },
+        }, 404);
+      }
+
+      if (course.instructor_id !== user!.userId && user!.role !== 'admin') {
+        return c.json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: '権限がありません' },
+        }, 403);
+      }
+
+      // TODO: Delete from Cloudflare Images if needed
+
+      await db.prepare(`
+        UPDATE el_courses SET thumbnail_url = NULL, updated_at = datetime('now') WHERE id = ?
+      `).bind(id).run();
+
+      return c.json({
+        success: true,
+        data: { deleted: true },
+        message: 'サムネイルを削除しました',
+      });
+    } catch (error) {
+      console.error('Error deleting thumbnail:', error);
+      return c.json({
+        success: false,
+        error: { code: 'DATABASE_ERROR', message: 'サムネイルの削除に失敗しました' },
+      }, 500);
+    }
+  }
+);
+
+// POST /courses/:id/promo-video - Upload promotional video
+coursesRoutes.post(
+  '/:id/promo-video',
+  requireAuth,
+  requireRole(['instructor', 'admin']),
+  async (c) => {
+    const id = c.req.param('id');
+    const user = c.get('user');
+    const db = c.env.DB;
+
+    try {
+      // Verify ownership
+      const course = await db.prepare(`
+        SELECT instructor_id FROM el_courses WHERE id = ? AND deleted_at IS NULL
+      `).bind(id).first<{ instructor_id: string }>();
+
+      if (!course) {
+        return c.json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'コースが見つかりません' },
+        }, 404);
+      }
+
+      if (course.instructor_id !== user!.userId && user!.role !== 'admin') {
+        return c.json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: '権限がありません' },
+        }, 403);
+      }
+
+      // Parse form data
+      const formData = await c.req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return c.json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'ファイルが必要です' },
+        }, 400);
+      }
+
+      // Validate file type
+      const allowedTypes = ['video/mp4', 'video/quicktime', 'video/webm'];
+      if (!allowedTypes.includes(file.type)) {
+        return c.json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'MP4、MOV、WebM形式のみ対応しています' },
+        }, 400);
+      }
+
+      // Check file size (max 100MB)
+      if (file.size > 100 * 1024 * 1024) {
+        return c.json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'ファイルサイズは100MB以下にしてください' },
+        }, 400);
+      }
+
+      // Upload to Cloudflare Stream
+      const accountId = c.env.CLOUDFLARE_ACCOUNT_ID;
+      const streamApiToken = c.env.CLOUDFLARE_STREAM_API_TOKEN;
+      
+      let promoVideoUrl = '';
+      
+      if (accountId && streamApiToken) {
+        // Get direct upload URL
+        const uploadUrlResponse = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/direct_upload`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${streamApiToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              maxDurationSeconds: 300, // 5 minutes max for promo
+              allowedOrigins: ['*'],
+              meta: {
+                courseId: id,
+                type: 'promo',
+              },
+            }),
+          }
+        );
+        
+        const uploadUrlResult = await uploadUrlResponse.json() as any;
+        
+        if (uploadUrlResult.success && uploadUrlResult.result) {
+          // Upload the file
+          const uploadFormData = new FormData();
+          uploadFormData.append('file', file);
+          
+          await fetch(uploadUrlResult.result.uploadURL, {
+            method: 'POST',
+            body: uploadFormData,
+          });
+          
+          // Get the video URL
+          promoVideoUrl = `https://cloudflarestream.com/${uploadUrlResult.result.uid}/manifest/video.m3u8`;
+        } else {
+          throw new Error(uploadUrlResult.errors?.[0]?.message || 'Video upload failed');
+        }
+      } else {
+        // Cloudflare Stream API not configured - return error
+        return c.json({
+          success: false,
+          error: { code: 'CONFIGURATION_ERROR', message: '動画アップロード機能は現在利用できません。管理者にお問い合わせください。' },
+        }, 503);
+      }
+
+      // Update course promo_video_url
+      await db.prepare(`
+        UPDATE el_courses SET promo_video_url = ?, updated_at = datetime('now') WHERE id = ?
+      `).bind(promoVideoUrl, id).run();
+
+      return c.json({
+        success: true,
+        data: {
+          promoVideoUrl,
+        },
+        message: 'プロモーション動画をアップロードしました',
+      });
+    } catch (error) {
+      console.error('Error uploading promo video:', error);
+      return c.json({
+        success: false,
+        error: { code: 'UPLOAD_ERROR', message: 'プロモーション動画のアップロードに失敗しました' },
+      }, 500);
+    }
+  }
+);
+
+// DELETE /courses/:id/promo-video - Delete promotional video
+coursesRoutes.delete(
+  '/:id/promo-video',
+  requireAuth,
+  requireRole(['instructor', 'admin']),
+  async (c) => {
+    const id = c.req.param('id');
+    const user = c.get('user');
+    const db = c.env.DB;
+
+    try {
+      const course = await db.prepare(`
+        SELECT instructor_id FROM el_courses WHERE id = ? AND deleted_at IS NULL
+      `).bind(id).first<{ instructor_id: string }>();
+
+      if (!course) {
+        return c.json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'コースが見つかりません' },
+        }, 404);
+      }
+
+      if (course.instructor_id !== user!.userId && user!.role !== 'admin') {
+        return c.json({
+          success: false,
+          error: { code: 'FORBIDDEN', message: '権限がありません' },
+        }, 403);
+      }
+
+      await db.prepare(`
+        UPDATE el_courses SET promo_video_url = NULL, updated_at = datetime('now') WHERE id = ?
+      `).bind(id).run();
+
+      return c.json({
+        success: true,
+        data: { deleted: true },
+        message: 'プロモーション動画を削除しました',
+      });
+    } catch (error) {
+      console.error('Error deleting promo video:', error);
+      return c.json({
+        success: false,
+        error: { code: 'DATABASE_ERROR', message: 'プロモーション動画の削除に失敗しました' },
       }, 500);
     }
   }

@@ -6,6 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ENVIRONMENT = "production"
 JWT_SECRET = "change-this-in-production-use-secrets"
+CLOUDFLARE_ACCOUNT_ID = "a2beb7b88e3c7a9888e6ec0849498ce7"
 
 # D1 Database
 [[d1_databases]]

@@ -300,6 +300,16 @@ class ApiClient {
     );
   }
 
+  async confirmPayment(sessionId: string) {
+    return this.request<{
+      enrollmentId: string;
+      courseId: string;
+      message: string;
+    }>(`/v1/payments/confirm/${sessionId}`, {
+      method: 'POST',
+    });
+  }
+
   async getPaymentHistory() {
     return this.request<{
       payments: Array<{
@@ -833,6 +843,13 @@ class ApiClient {
         commissionRate: number;
         totalEarnings: number;
         pendingBalance: number;
+        bankInfo: {
+          bankName: string;
+          branchName: string;
+          accountType: 'ordinary' | 'checking';
+          accountNumber: string;
+          accountHolder: string;
+        } | null;
       } | null;
     }>('/v1/instructor/settings');
   }
@@ -852,6 +869,13 @@ class ApiClient {
       experience?: string | null;
       socialLinks?: Record<string, string> | null;
       website?: string | null;
+      bankInfo?: {
+        bankName: string;
+        branchName: string;
+        accountType: 'ordinary' | 'checking';
+        accountNumber: string;
+        accountHolder: string;
+      } | null;
     };
   }) {
     return this.request<{ message: string }>('/v1/instructor/settings', {
@@ -1272,6 +1296,7 @@ class ApiClient {
         linkedLecture?: {
           id: string;
           title: string;
+          courseId: string;
           courseTitle: string;
         };
       }>;

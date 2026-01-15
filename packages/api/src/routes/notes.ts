@@ -37,8 +37,8 @@ notesRoutes.get('/', async (c) => {
       // Get notes for specific lecture
       query = `
         SELECT n.*, l.title as lecture_title
-        FROM notes n
-        JOIN lectures l ON n.lecture_id = l.id
+        FROM el_notes n
+        JOIN el_lectures l ON n.lecture_id = l.id
         WHERE n.user_id = ? AND n.lecture_id = ?
         ORDER BY n.timestamp_seconds ASC, n.created_at DESC
       `;
@@ -47,9 +47,9 @@ notesRoutes.get('/', async (c) => {
       // Get notes for all lectures in a course
       query = `
         SELECT n.*, l.title as lecture_title, s.title as section_title
-        FROM notes n
-        JOIN lectures l ON n.lecture_id = l.id
-        JOIN sections s ON l.section_id = s.id
+        FROM el_notes n
+        JOIN el_lectures l ON n.lecture_id = l.id
+        JOIN el_sections s ON l.section_id = s.id
         WHERE n.user_id = ? AND s.course_id = ?
         ORDER BY s.sort_order, l.sort_order, n.timestamp_seconds ASC
       `;
@@ -58,10 +58,10 @@ notesRoutes.get('/', async (c) => {
       // Get all notes
       query = `
         SELECT n.*, l.title as lecture_title, s.title as section_title, c.title as course_title, c.id as course_id
-        FROM notes n
-        JOIN lectures l ON n.lecture_id = l.id
-        JOIN sections s ON l.section_id = s.id
-        JOIN courses c ON s.course_id = c.id
+        FROM el_notes n
+        JOIN el_lectures l ON n.lecture_id = l.id
+        JOIN el_sections s ON l.section_id = s.id
+        JOIN el_courses c ON s.course_id = c.id
         WHERE n.user_id = ?
         ORDER BY n.updated_at DESC
         LIMIT 100
@@ -74,7 +74,18 @@ notesRoutes.get('/', async (c) => {
     return c.json({
       success: true,
       data: {
-        notes: result.results || [],
+        notes: (result.results || []).map((note: any) => ({
+          id: note.id,
+          lectureId: note.lecture_id,
+          lectureTitle: note.lecture_title,
+          sectionTitle: note.section_title,
+          courseTitle: note.course_title,
+          courseId: note.course_id,
+          content: note.content,
+          timestampSeconds: note.timestamp_seconds,
+          createdAt: note.created_at,
+          updatedAt: note.updated_at,
+        })),
       },
     });
   } catch (error) {
@@ -98,7 +109,7 @@ notesRoutes.post('/', async (c) => {
     const now = new Date().toISOString();
 
     await c.env.DB.prepare(`
-      INSERT INTO notes (id, user_id, lecture_id, content, timestamp_seconds, created_at, updated_at)
+      INSERT INTO el_notes (id, user_id, lecture_id, content, timestamp_seconds, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).bind(noteId, userId, lectureId, content, timestampSeconds || null, now, now).run();
 
@@ -133,25 +144,25 @@ notesRoutes.put('/:noteId', async (c) => {
 
   try {
     // Check ownership
-    const existing = await c.env.DB.prepare('SELECT * FROM notes WHERE id = ?').bind(noteId).first();
+    const existing = await c.env.DB.prepare('SELECT * FROM el_notes WHERE id = ?').bind(noteId).first();
     if (!existing) {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Note not found' } }, 404);
     }
-    if (existing.user_id !== userId) {
+    if ((existing as any).user_id !== userId) {
       return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'You do not own this note' } }, 403);
     }
 
     const now = new Date().toISOString();
     await c.env.DB.prepare(`
-      UPDATE notes SET content = ?, timestamp_seconds = ?, updated_at = ? WHERE id = ?
-    `).bind(content, timestampSeconds || existing.timestamp_seconds, now, noteId).run();
+      UPDATE el_notes SET content = ?, timestamp_seconds = ?, updated_at = ? WHERE id = ?
+    `).bind(content, timestampSeconds || (existing as any).timestamp_seconds, now, noteId).run();
 
     return c.json({
       success: true,
       data: {
         id: noteId,
         content,
-        timestampSeconds: timestampSeconds || existing.timestamp_seconds,
+        timestampSeconds: timestampSeconds || (existing as any).timestamp_seconds,
         updatedAt: now,
       },
     });
@@ -168,15 +179,15 @@ notesRoutes.delete('/:noteId', async (c) => {
 
   try {
     // Check ownership
-    const existing = await c.env.DB.prepare('SELECT * FROM notes WHERE id = ?').bind(noteId).first();
+    const existing = await c.env.DB.prepare('SELECT * FROM el_notes WHERE id = ?').bind(noteId).first();
     if (!existing) {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Note not found' } }, 404);
     }
-    if (existing.user_id !== userId) {
+    if ((existing as any).user_id !== userId) {
       return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'You do not own this note' } }, 403);
     }
 
-    await c.env.DB.prepare('DELETE FROM notes WHERE id = ?').bind(noteId).run();
+    await c.env.DB.prepare('DELETE FROM el_notes WHERE id = ?').bind(noteId).run();
 
     return c.json({ success: true, data: { deleted: true } });
   } catch (error) {
@@ -202,8 +213,8 @@ notesRoutes.get('/bookmarks', async (c) => {
     if (lectureId) {
       query = `
         SELECT b.*, l.title as lecture_title
-        FROM bookmarks b
-        JOIN lectures l ON b.lecture_id = l.id
+        FROM el_bookmarks b
+        JOIN el_lectures l ON b.lecture_id = l.id
         WHERE b.user_id = ? AND b.lecture_id = ?
         ORDER BY b.timestamp_seconds ASC
       `;
@@ -211,9 +222,9 @@ notesRoutes.get('/bookmarks', async (c) => {
     } else if (courseId) {
       query = `
         SELECT b.*, l.title as lecture_title, s.title as section_title
-        FROM bookmarks b
-        JOIN lectures l ON b.lecture_id = l.id
-        JOIN sections s ON l.section_id = s.id
+        FROM el_bookmarks b
+        JOIN el_lectures l ON b.lecture_id = l.id
+        JOIN el_sections s ON l.section_id = s.id
         WHERE b.user_id = ? AND s.course_id = ?
         ORDER BY s.sort_order, l.sort_order, b.timestamp_seconds ASC
       `;
@@ -221,10 +232,10 @@ notesRoutes.get('/bookmarks', async (c) => {
     } else {
       query = `
         SELECT b.*, l.title as lecture_title, s.title as section_title, c.title as course_title, c.id as course_id
-        FROM bookmarks b
-        JOIN lectures l ON b.lecture_id = l.id
-        JOIN sections s ON l.section_id = s.id
-        JOIN courses c ON s.course_id = c.id
+        FROM el_bookmarks b
+        JOIN el_lectures l ON b.lecture_id = l.id
+        JOIN el_sections s ON l.section_id = s.id
+        JOIN el_courses c ON s.course_id = c.id
         WHERE b.user_id = ?
         ORDER BY b.created_at DESC
         LIMIT 100
@@ -237,7 +248,17 @@ notesRoutes.get('/bookmarks', async (c) => {
     return c.json({
       success: true,
       data: {
-        bookmarks: result.results || [],
+        bookmarks: (result.results || []).map((bookmark: any) => ({
+          id: bookmark.id,
+          lectureId: bookmark.lecture_id,
+          lectureTitle: bookmark.lecture_title,
+          sectionTitle: bookmark.section_title,
+          courseTitle: bookmark.course_title,
+          courseId: bookmark.course_id,
+          title: bookmark.title,
+          timestampSeconds: bookmark.timestamp_seconds,
+          createdAt: bookmark.created_at,
+        })),
       },
     });
   } catch (error) {
@@ -261,7 +282,7 @@ notesRoutes.post('/bookmarks', async (c) => {
     const now = new Date().toISOString();
 
     await c.env.DB.prepare(`
-      INSERT INTO bookmarks (id, user_id, lecture_id, title, timestamp_seconds, created_at)
+      INSERT INTO el_bookmarks (id, user_id, lecture_id, title, timestamp_seconds, created_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `).bind(bookmarkId, userId, lectureId, title || null, timestampSeconds, now).run();
 
@@ -292,15 +313,15 @@ notesRoutes.delete('/bookmarks/:bookmarkId', async (c) => {
 
   try {
     // Check ownership
-    const existing = await c.env.DB.prepare('SELECT * FROM bookmarks WHERE id = ?').bind(bookmarkId).first();
+    const existing = await c.env.DB.prepare('SELECT * FROM el_bookmarks WHERE id = ?').bind(bookmarkId).first();
     if (!existing) {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'Bookmark not found' } }, 404);
     }
-    if (existing.user_id !== userId) {
+    if ((existing as any).user_id !== userId) {
       return c.json({ success: false, error: { code: 'FORBIDDEN', message: 'You do not own this bookmark' } }, 403);
     }
 
-    await c.env.DB.prepare('DELETE FROM bookmarks WHERE id = ?').bind(bookmarkId).run();
+    await c.env.DB.prepare('DELETE FROM el_bookmarks WHERE id = ?').bind(bookmarkId).run();
 
     return c.json({ success: true, data: { deleted: true } });
   } catch (error) {

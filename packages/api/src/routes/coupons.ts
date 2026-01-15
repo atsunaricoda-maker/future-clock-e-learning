@@ -182,20 +182,18 @@ couponsRoutes.post(
 
       await c.env.DB.prepare(`
         INSERT INTO el_coupons (
-          id, code, description, discount_type, discount_value, 
-          course_id, max_uses, max_uses_per_user, valid_from, valid_until,
-          is_active, used_count, created_by, created_at, updated_at
+          id, code, discount_type, discount_value, 
+          course_id, max_uses, valid_from, valid_until,
+          is_active, used_count, instructor_id, created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)
       `).bind(
         couponId,
         data.code.toUpperCase(),
-        data.description || null,
         data.discountType,
         data.discountValue,
         data.courseId || null,
         data.maxUses || null,
-        data.maxUsesPerUser || null,
         data.validFrom || null,
         data.validUntil || null,
         userId,
@@ -234,8 +232,8 @@ couponsRoutes.get('/', requireAuth, requireInstructorOrAdmin, async (c) => {
 
     // 講師は自分が作成したクーポンのみ
     if (userRole === 'instructor') {
-      sql += ' WHERE c.created_by = ?';
-      countSql += ' WHERE created_by = ?';
+      sql += ' WHERE c.instructor_id = ?';
+      countSql += ' WHERE instructor_id = ?';
       params.push(userId);
       countParams.push(userId);
     }
@@ -290,7 +288,7 @@ couponsRoutes.put('/:couponId/deactivate', requireAuth, requireInstructorOrAdmin
     // 権限チェック
     if (userRole === 'instructor') {
       const coupon = await c.env.DB.prepare(
-        'SELECT id FROM el_coupons WHERE id = ? AND created_by = ?'
+        'SELECT id FROM el_coupons WHERE id = ? AND instructor_id = ?'
       ).bind(couponId, userId).first();
 
       if (!coupon) {

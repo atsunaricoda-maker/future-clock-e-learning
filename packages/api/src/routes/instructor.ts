@@ -101,6 +101,7 @@ instructorRoutes.get('/courses', requireInstructor, async (c) => {
       SELECT 
         c.id, c.title, c.subtitle, c.status, c.price, c.currency, c.is_published,
         c.total_enrollments, c.average_rating, c.total_reviews, c.created_at, c.updated_at,
+        c.rejection_reason,
         (SELECT COUNT(*) FROM el_sections s WHERE s.course_id = c.id) as total_sections,
         (SELECT COUNT(*) FROM el_lectures l JOIN el_sections s ON l.section_id = s.id WHERE s.course_id = c.id) as total_lectures,
         (SELECT COALESCE(SUM(l.duration), 0) FROM el_lectures l JOIN el_sections s ON l.section_id = s.id WHERE s.course_id = c.id) as total_duration,
@@ -141,6 +142,7 @@ instructorRoutes.get('/courses', requireInstructor, async (c) => {
           title: course.title,
           subtitle: course.subtitle,
           status: course.status,
+          rejectionReason: course.rejection_reason || null,
           price: course.price,
           currency: course.currency,
           isPublished: !!course.is_published,
@@ -514,7 +516,7 @@ instructorRoutes.get('/settings', requireInstructor, async (c) => {
   try {
     // ユーザー情報と講師プロフィールを取得
     const [user, profile, instructorProfile] = await Promise.all([
-      c.env.DB.prepare('SELECT id, email, name FROM el_users WHERE id = ?').bind(userId).first(),
+      c.env.DB.prepare('SELECT id, email FROM el_users WHERE id = ?').bind(userId).first(),
       c.env.DB.prepare('SELECT * FROM el_user_profiles WHERE user_id = ?').bind(userId).first(),
       c.env.DB.prepare('SELECT * FROM el_instructor_profiles WHERE user_id = ?').bind(userId).first(),
     ]);
@@ -523,13 +525,18 @@ instructorRoutes.get('/settings', requireInstructor, async (c) => {
       return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'ユーザーが見つかりません' } }, 404);
     }
 
+    // display_name または first_name + last_name を使用
+    const userName = profile 
+      ? ((profile as any).display_name || `${(profile as any).first_name || ''} ${(profile as any).last_name || ''}`.trim() || (user as any).email)
+      : (user as any).email;
+
     return c.json({
       success: true,
       data: {
         user: {
           id: (user as any).id,
           email: (user as any).email,
-          name: (user as any).name,
+          name: userName,
         },
         profile: profile ? {
           displayName: (profile as any).display_name,
@@ -551,6 +558,7 @@ instructorRoutes.get('/settings', requireInstructor, async (c) => {
           commissionRate: (instructorProfile as any).commission_rate,
           totalEarnings: (instructorProfile as any).total_earnings,
           pendingBalance: (instructorProfile as any).pending_balance,
+          bankInfo: (instructorProfile as any).bank_info ? JSON.parse((instructorProfile as any).bank_info) : null,
         } : null,
       }
     });
@@ -629,6 +637,7 @@ instructorRoutes.put('/settings', requireInstructor, async (c) => {
             experience = COALESCE(?, experience),
             social_links = COALESCE(?, social_links),
             website = COALESCE(?, website),
+            bank_info = COALESCE(?, bank_info),
             updated_at = ?
           WHERE user_id = ?
         `).bind(
@@ -637,13 +646,14 @@ instructorRoutes.put('/settings', requireInstructor, async (c) => {
           instructorProfile.experience || null,
           instructorProfile.socialLinks ? JSON.stringify(instructorProfile.socialLinks) : null,
           instructorProfile.website || null,
+          instructorProfile.bankInfo ? JSON.stringify(instructorProfile.bankInfo) : null,
           now,
           userId
         ).run();
       } else {
         await c.env.DB.prepare(`
-          INSERT INTO el_instructor_profiles (id, user_id, headline, expertise, experience, social_links, website, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+          INSERT INTO el_instructor_profiles (id, user_id, headline, expertise, experience, social_links, website, bank_info, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
           crypto.randomUUID(),
           userId,
@@ -652,6 +662,7 @@ instructorRoutes.put('/settings', requireInstructor, async (c) => {
           instructorProfile.experience || null,
           instructorProfile.socialLinks ? JSON.stringify(instructorProfile.socialLinks) : null,
           instructorProfile.website || null,
+          instructorProfile.bankInfo ? JSON.stringify(instructorProfile.bankInfo) : null,
           now,
           now
         ).run();
@@ -734,6 +745,52 @@ instructorRoutes.get('/students', requireInstructor, async (c) => {
     });
   } catch (error) {
     console.error('Get instructor students error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
+  }
+});
+
+// 講師の動画一覧取得
+instructorRoutes.get('/videos', requireInstructor, async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    // 講師のコースに紐づいた動画を取得
+    const videos = await c.env.DB.prepare(`
+      SELECT 
+        v.id, v.duration, v.status, 
+        v.thumbnail_url, v.file_size, v.created_at,
+        l.id as lecture_id, l.title as lecture_title,
+        c.id as course_id, c.title as course_title
+      FROM el_videos v
+      JOIN el_lectures l ON v.lecture_id = l.id
+      JOIN el_sections s ON l.section_id = s.id
+      JOIN el_courses c ON s.course_id = c.id
+      WHERE c.instructor_id = ?
+      ORDER BY v.created_at DESC
+    `).bind(userId).all();
+
+    return c.json({
+      success: true,
+      data: {
+        videos: videos.results.map((v: any) => ({
+          id: v.id,
+          title: v.lecture_title, // 動画タイトルはレクチャータイトルを使用
+          duration: v.duration || 0,
+          status: v.status || 'ready',
+          thumbnailUrl: v.thumbnail_url,
+          size: v.file_size,
+          createdAt: v.created_at,
+          linkedLecture: v.lecture_id ? {
+            id: v.lecture_id,
+            title: v.lecture_title,
+            courseId: v.course_id,
+            courseTitle: v.course_title,
+          } : null,
+        })),
+      }
+    });
+  } catch (error) {
+    console.error('Get instructor videos error:', error);
     return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
   }
 });

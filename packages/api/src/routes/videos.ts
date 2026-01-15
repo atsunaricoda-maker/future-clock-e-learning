@@ -103,17 +103,11 @@ videosRoutes.get('/status/:videoId', requireAuth, async (c) => {
     const apiToken = c.env.CLOUDFLARE_STREAM_API_TOKEN;
 
     if (!accountId || !apiToken) {
-      // モック応答（開発環境用）
+      // Cloudflare Stream APIが設定されていない場合はエラーを返す
       return c.json({
-        success: true,
-        data: {
-          videoId,
-          status: 'ready',
-          duration: 600, // 10分
-          thumbnail: `https://cloudflarestream.com/${videoId}/thumbnails/thumbnail.jpg`,
-          playbackUrl: `https://cloudflarestream.com/${videoId}/manifest/video.m3u8`,
-        }
-      });
+        success: false,
+        error: { code: 'CONFIGURATION_ERROR', message: '動画ステータス確認機能は現在利用できません' }
+      }, 503);
     }
 
     const response = await fetch(
@@ -219,9 +213,10 @@ videosRoutes.post(
           console.error('Failed to get video info:', e);
         }
       } else {
-        // モック値（開発環境）
-        hlsUrl = `https://cloudflarestream.com/${streamVideoId}/manifest/video.m3u8`;
-        thumbnailUrl = `https://cloudflarestream.com/${streamVideoId}/thumbnails/thumbnail.jpg`;
+        // Cloudflare Stream APIが設定されていない場合は空のURLを設定
+        // 実際の動画再生は別途対応が必要
+        hlsUrl = '';
+        thumbnailUrl = '';
         videoDuration = duration || 600;
       }
 
