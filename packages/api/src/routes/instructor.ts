@@ -507,6 +507,167 @@ instructorRoutes.get('/analytics', requireInstructor, async (c) => {
   }
 });
 
+// 講師設定取得
+instructorRoutes.get('/settings', requireInstructor, async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    // ユーザー情報と講師プロフィールを取得
+    const [user, profile, instructorProfile] = await Promise.all([
+      c.env.DB.prepare('SELECT id, email, name FROM el_users WHERE id = ?').bind(userId).first(),
+      c.env.DB.prepare('SELECT * FROM el_user_profiles WHERE user_id = ?').bind(userId).first(),
+      c.env.DB.prepare('SELECT * FROM el_instructor_profiles WHERE user_id = ?').bind(userId).first(),
+    ]);
+
+    if (!user) {
+      return c.json({ success: false, error: { code: 'NOT_FOUND', message: 'ユーザーが見つかりません' } }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: {
+        user: {
+          id: (user as any).id,
+          email: (user as any).email,
+          name: (user as any).name,
+        },
+        profile: profile ? {
+          displayName: (profile as any).display_name,
+          firstName: (profile as any).first_name,
+          lastName: (profile as any).last_name,
+          avatarUrl: (profile as any).avatar_url,
+          bio: (profile as any).bio,
+          timezone: (profile as any).timezone,
+          language: (profile as any).language,
+        } : null,
+        instructorProfile: instructorProfile ? {
+          headline: (instructorProfile as any).headline,
+          expertise: (instructorProfile as any).expertise,
+          experience: (instructorProfile as any).experience,
+          socialLinks: (instructorProfile as any).social_links ? JSON.parse((instructorProfile as any).social_links) : null,
+          website: (instructorProfile as any).website,
+          stripeAccountId: (instructorProfile as any).stripe_account_id,
+          payoutEnabled: (instructorProfile as any).payout_enabled === 1,
+          commissionRate: (instructorProfile as any).commission_rate,
+          totalEarnings: (instructorProfile as any).total_earnings,
+          pendingBalance: (instructorProfile as any).pending_balance,
+        } : null,
+      }
+    });
+  } catch (error) {
+    console.error('Get instructor settings error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
+  }
+});
+
+// 講師設定更新
+instructorRoutes.put('/settings', requireInstructor, async (c) => {
+  const userId = c.get('userId');
+
+  try {
+    const body = await c.req.json();
+    const { profile, instructorProfile } = body;
+    const now = new Date().toISOString();
+
+    // プロフィール更新
+    if (profile) {
+      const existingProfile = await c.env.DB.prepare(
+        'SELECT id FROM el_user_profiles WHERE user_id = ?'
+      ).bind(userId).first();
+
+      if (existingProfile) {
+        await c.env.DB.prepare(`
+          UPDATE el_user_profiles SET
+            display_name = COALESCE(?, display_name),
+            first_name = COALESCE(?, first_name),
+            last_name = COALESCE(?, last_name),
+            bio = COALESCE(?, bio),
+            timezone = COALESCE(?, timezone),
+            language = COALESCE(?, language),
+            updated_at = ?
+          WHERE user_id = ?
+        `).bind(
+          profile.displayName || null,
+          profile.firstName || null,
+          profile.lastName || null,
+          profile.bio || null,
+          profile.timezone || null,
+          profile.language || null,
+          now,
+          userId
+        ).run();
+      } else {
+        await c.env.DB.prepare(`
+          INSERT INTO el_user_profiles (id, user_id, display_name, first_name, last_name, bio, timezone, language, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          crypto.randomUUID(),
+          userId,
+          profile.displayName || null,
+          profile.firstName || null,
+          profile.lastName || null,
+          profile.bio || null,
+          profile.timezone || 'Asia/Tokyo',
+          profile.language || 'ja',
+          now,
+          now
+        ).run();
+      }
+    }
+
+    // 講師プロフィール更新
+    if (instructorProfile) {
+      const existingInstructorProfile = await c.env.DB.prepare(
+        'SELECT id FROM el_instructor_profiles WHERE user_id = ?'
+      ).bind(userId).first();
+
+      if (existingInstructorProfile) {
+        await c.env.DB.prepare(`
+          UPDATE el_instructor_profiles SET
+            headline = COALESCE(?, headline),
+            expertise = COALESCE(?, expertise),
+            experience = COALESCE(?, experience),
+            social_links = COALESCE(?, social_links),
+            website = COALESCE(?, website),
+            updated_at = ?
+          WHERE user_id = ?
+        `).bind(
+          instructorProfile.headline || null,
+          instructorProfile.expertise || null,
+          instructorProfile.experience || null,
+          instructorProfile.socialLinks ? JSON.stringify(instructorProfile.socialLinks) : null,
+          instructorProfile.website || null,
+          now,
+          userId
+        ).run();
+      } else {
+        await c.env.DB.prepare(`
+          INSERT INTO el_instructor_profiles (id, user_id, headline, expertise, experience, social_links, website, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).bind(
+          crypto.randomUUID(),
+          userId,
+          instructorProfile.headline || null,
+          instructorProfile.expertise || null,
+          instructorProfile.experience || null,
+          instructorProfile.socialLinks ? JSON.stringify(instructorProfile.socialLinks) : null,
+          instructorProfile.website || null,
+          now,
+          now
+        ).run();
+      }
+    }
+
+    return c.json({
+      success: true,
+      message: '設定を更新しました',
+    });
+  } catch (error) {
+    console.error('Update instructor settings error:', error);
+    return c.json({ success: false, error: { code: 'DATABASE_ERROR', message: 'データベースエラーが発生しました' } }, 500);
+  }
+});
+
 // 受講者一覧
 instructorRoutes.get('/students', requireInstructor, async (c) => {
   const userId = c.get('userId');

@@ -807,6 +807,59 @@ class ApiClient {
     }>(`/v1/instructor/students${query ? `?${query}` : ''}`);
   }
 
+  async getInstructorSettings() {
+    return this.request<{
+      user: {
+        id: string;
+        email: string;
+        name: string;
+      };
+      profile: {
+        displayName: string | null;
+        firstName: string | null;
+        lastName: string | null;
+        avatarUrl: string | null;
+        bio: string | null;
+        timezone: string | null;
+        language: string | null;
+      } | null;
+      instructorProfile: {
+        headline: string | null;
+        expertise: string | null;
+        experience: string | null;
+        socialLinks: Record<string, string> | null;
+        website: string | null;
+        payoutEnabled: boolean;
+        commissionRate: number;
+        totalEarnings: number;
+        pendingBalance: number;
+      } | null;
+    }>('/v1/instructor/settings');
+  }
+
+  async updateInstructorSettings(data: {
+    profile?: {
+      displayName?: string | null;
+      firstName?: string | null;
+      lastName?: string | null;
+      bio?: string | null;
+      timezone?: string | null;
+      language?: string | null;
+    };
+    instructorProfile?: {
+      headline?: string | null;
+      expertise?: string | null;
+      experience?: string | null;
+      socialLinks?: Record<string, string> | null;
+      website?: string | null;
+    };
+  }) {
+    return this.request<{ message: string }>('/v1/instructor/settings', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
   // Reviews
   async getCourseReviews(courseId: string, params?: { page?: number; limit?: number; sortBy?: string }) {
     const searchParams = new URLSearchParams();
