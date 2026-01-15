@@ -127,9 +127,9 @@ export default function AdminCourseReviewsPage() {
     return `${minutes}分`;
   };
 
-  const formatPrice = (price: number, currency: string) => {
+  const formatPrice = (price: number, currency?: string) => {
     if (price === 0) return '無料';
-    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency }).format(price);
+    return new Intl.NumberFormat('ja-JP', { style: 'currency', currency: currency || 'JPY' }).format(price);
   };
 
   const levelLabels: Record<string, string> = {

@@ -246,27 +246,37 @@ export default function AdminPayoutsPage() {
       if (response.success && response.data && response.data.instructors) {
         setInstructors(response.data.instructors.map(i => ({
           ...i,
-          ppvTotalSales: i.totalSales * 0.5,
-          ppvPlatformFee: i.platformFee * 0.5,
-          ppvNetPayout: i.netPayout * 0.5,
+          totalSales: i.totalSales || 0,
+          platformFee: i.platformFee || 0,
+          netPayout: i.netPayout || 0,
+          pendingBalance: i.pendingBalance || 0,
+          paidAmount: i.paidAmount || 0,
+          commissionRate: i.commissionRate || 70,
+          ppvTotalSales: (i.totalSales || 0) * 0.5,
+          ppvPlatformFee: (i.platformFee || 0) * 0.5,
+          ppvNetPayout: (i.netPayout || 0) * 0.5,
           ppvTransactionCount: Math.floor(Math.random() * 20) + 5,
-          packageTotalSales: i.totalSales * 0.2,
-          packagePlatformFee: i.platformFee * 0.2,
-          packageNetPayout: i.netPayout * 0.2,
+          packageTotalSales: (i.totalSales || 0) * 0.2,
+          packagePlatformFee: (i.platformFee || 0) * 0.2,
+          packageNetPayout: (i.netPayout || 0) * 0.2,
           packageTransactionCount: Math.floor(Math.random() * 10) + 2,
-          subscriptionShare: i.totalSales * 0.3,
+          subscriptionShare: (i.totalSales || 0) * 0.3,
           subscriptionStudentCount: Math.floor(Math.random() * 100) + 10,
         })));
         setPagination(prev => ({ ...prev, ...response.data!.pagination }));
         if (response.data.summary) {
+          const s = response.data.summary;
           setSummary({
-            ...response.data.summary,
-            ppvTotalPending: response.data.summary.totalPendingPayouts * 0.5,
+            totalPendingPayouts: s.totalPendingPayouts || 0,
+            totalPaidThisMonth: s.totalPaidThisMonth || 0,
+            totalInstructors: s.totalInstructors || 0,
+            averageCommissionRate: s.averageCommissionRate || 70,
+            ppvTotalPending: (s.totalPendingPayouts || 0) * 0.5,
             ppvTransactionCount: 156,
-            packageTotalPending: response.data.summary.totalPendingPayouts * 0.2,
+            packageTotalPending: (s.totalPendingPayouts || 0) * 0.2,
             packageTransactionCount: 32,
-            subscriptionTotalPending: response.data.summary.totalPendingPayouts * 0.3,
-            subscriptionInstructorCount: response.data.summary.totalInstructors,
+            subscriptionTotalPending: (s.totalPendingPayouts || 0) * 0.3,
+            subscriptionInstructorCount: s.totalInstructors || 0,
           });
         }
       }
@@ -602,9 +612,10 @@ export default function AdminPayoutsPage() {
       if (response.success && response.data && response.data.payouts) {
         setPayoutHistory(response.data.payouts.map(p => ({
           ...p,
-          ppvAmount: p.amount * 0.5,
-          packageAmount: p.amount * 0.2,
-          subscriptionAmount: p.amount * 0.3,
+          amount: p.amount || 0,
+          ppvAmount: (p.amount || 0) * 0.5,
+          packageAmount: (p.amount || 0) * 0.2,
+          subscriptionAmount: (p.amount || 0) * 0.3,
         })));
         setPagination(prev => ({ ...prev, ...response.data!.pagination }));
       }
