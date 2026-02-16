@@ -22,12 +22,24 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { VideoUpload } from "@/components/admin/video-upload";
+import { isSupabaseVideoUrl } from "@/lib/video-utils";
 import type { Lesson } from "@/types/database";
 
 interface LessonFormProps {
   initialData?: Lesson;
   onSubmit: (values: LessonFormValues) => Promise<void>;
   loading?: boolean;
+}
+
+/**
+ * 既存のcontent_urlからタブの初期値を判定
+ */
+function getInitialVideoTab(url?: string | null): string {
+  if (!url) return "url";
+  if (isSupabaseVideoUrl(url)) return "upload";
+  return "url";
 }
 
 export function LessonForm({ initialData, onSubmit, loading }: LessonFormProps) {
@@ -104,29 +116,72 @@ export function LessonForm({ initialData, onSubmit, loading }: LessonFormProps) 
           )}
         />
 
-        {(lessonType === "video" || lessonType === "document") && (
+        {lessonType === "video" && (
           <FormField
             control={form.control}
             name="content_url"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>
-                  {lessonType === "video" ? "動画URL" : "ドキュメントURL"}
-                </FormLabel>
+                <FormLabel>動画ソース</FormLabel>
+                <Tabs
+                  defaultValue={getInitialVideoTab(initialData?.content_url)}
+                  className="w-full"
+                >
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="url">URL入力</TabsTrigger>
+                    <TabsTrigger value="upload">ファイルアップロード</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="url" className="mt-3">
+                    <FormControl>
+                      <Input
+                        placeholder="https://www.youtube.com/watch?v=..."
+                        value={
+                          !isSupabaseVideoUrl(field.value || "")
+                            ? field.value || ""
+                            : ""
+                        }
+                        onChange={(e) => field.onChange(e.target.value)}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      YouTube、Vimeo等のURLを入力
+                    </FormDescription>
+                  </TabsContent>
+
+                  <TabsContent value="upload" className="mt-3">
+                    <VideoUpload
+                      currentUrl={field.value || undefined}
+                      onUploadComplete={(url) => {
+                        field.onChange(url);
+                      }}
+                      onRemove={() => {
+                        field.onChange("");
+                      }}
+                    />
+                  </TabsContent>
+                </Tabs>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
+
+        {lessonType === "document" && (
+          <FormField
+            control={form.control}
+            name="content_url"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>ドキュメントURL</FormLabel>
                 <FormControl>
                   <Input
-                    placeholder={
-                      lessonType === "video"
-                        ? "https://www.youtube.com/watch?v=..."
-                        : "https://example.com/document.pdf"
-                    }
+                    placeholder="https://example.com/document.pdf"
                     {...field}
                   />
                 </FormControl>
                 <FormDescription>
-                  {lessonType === "video"
-                    ? "YouTube、Vimeo等のURLを入力"
-                    : "PDF等のドキュメントURLを入力"}
+                  PDF等のドキュメントURLを入力
                 </FormDescription>
                 <FormMessage />
               </FormItem>

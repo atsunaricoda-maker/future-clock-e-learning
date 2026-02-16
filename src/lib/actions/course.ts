@@ -5,6 +5,29 @@ import { createClient } from "@/lib/supabase/server";
 import { generateSlug } from "@/lib/slug";
 import type { CourseFormValues, SectionFormValues, LessonFormValues } from "@/lib/validations/course";
 
+// Supabase Storage の動画URLからストレージパスを抽出
+function extractVideoStoragePath(url: string): string | null {
+  const match = url.match(/\/storage\/v1\/object\/public\/videos\/(.+)$/);
+  return match ? match[1] : null;
+}
+
+function isSupabaseVideoUrl(url: string): boolean {
+  return /supabase\.co\/storage\/v1\/object\/public\/videos\//.test(url);
+}
+
+// Storage上の動画ファイルを削除する内部ヘルパー
+async function removeVideoFromStorage(contentUrl: string) {
+  if (!isSupabaseVideoUrl(contentUrl)) return;
+  const path = extractVideoStoragePath(contentUrl);
+  if (!path) return;
+  try {
+    const supabase = await createClient();
+    await supabase.storage.from("videos").remove([path]);
+  } catch (error) {
+    console.error("Failed to remove video from storage:", error);
+  }
+}
+
 // ============================================
 // COURSE ACTIONS
 // ============================================
@@ -276,6 +299,13 @@ export async function createLesson(sectionId: string, courseId: string, values: 
 export async function updateLesson(lessonId: string, courseId: string, values: LessonFormValues) {
   const supabase = await createClient();
 
+  // 旧レッスンのcontent_urlを取得（ストレージクリーンアップ用）
+  const { data: oldLesson } = await supabase
+    .from("lessons")
+    .select("content_url")
+    .eq("id", lessonId)
+    .single();
+
   const { data, error } = await supabase
     .from("lessons")
     .update({
@@ -295,6 +325,13 @@ export async function updateLesson(lessonId: string, courseId: string, values: L
     return { error: "レッスンの更新に失敗しました" };
   }
 
+  // 旧URLがStorage動画で、新URLと異なる場合は旧ファイルを削除
+  const oldUrl = oldLesson?.content_url;
+  const newUrl = values.content_url || null;
+  if (oldUrl && oldUrl !== newUrl) {
+    await removeVideoFromStorage(oldUrl);
+  }
+
   revalidatePath(`/admin/courses/${courseId}`);
   return { data };
 }
@@ -302,11 +339,23 @@ export async function updateLesson(lessonId: string, courseId: string, values: L
 export async function deleteLesson(lessonId: string, courseId: string) {
   const supabase = await createClient();
 
+  // 削除前にcontent_urlを取得（ストレージクリーンアップ用）
+  const { data: lesson } = await supabase
+    .from("lessons")
+    .select("content_url")
+    .eq("id", lessonId)
+    .single();
+
   const { error } = await supabase.from("lessons").delete().eq("id", lessonId);
 
   if (error) {
     console.error("deleteLesson error:", error);
     return { error: "レッスンの削除に失敗しました" };
+  }
+
+  // Storage上の動画ファイルも削除
+  if (lesson?.content_url) {
+    await removeVideoFromStorage(lesson.content_url);
   }
 
   revalidatePath(`/admin/courses/${courseId}`);
