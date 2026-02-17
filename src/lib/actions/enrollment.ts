@@ -124,7 +124,8 @@ export async function markLessonComplete(lessonId: string, courseSlug: string) {
 
 export async function updateVideoPosition(
   lessonId: string,
-  positionSeconds: number
+  positionSeconds: number,
+  maxWatchedSeconds?: number
 ) {
   const supabase = await createClient();
   const {
@@ -132,18 +133,22 @@ export async function updateVideoPosition(
   } = await supabase.auth.getUser();
   if (!user) return { error: "認証が必要です" };
 
+  const upsertData: Record<string, unknown> = {
+    user_id: user.id,
+    lesson_id: lessonId,
+    video_position_seconds: positionSeconds,
+    status: "in_progress" as const,
+    started_at: new Date().toISOString(),
+  };
+
+  // max_watched_seconds が指定されている場合のみ保存
+  if (maxWatchedSeconds !== undefined) {
+    upsertData.max_watched_seconds = maxWatchedSeconds;
+  }
+
   const { error } = await supabase
     .from("lesson_progress")
-    .upsert(
-      {
-        user_id: user.id,
-        lesson_id: lessonId,
-        video_position_seconds: positionSeconds,
-        status: "in_progress" as const,
-        started_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,lesson_id" }
-    );
+    .upsert(upsertData, { onConflict: "user_id,lesson_id" });
 
   if (error) {
     console.error("updateVideoPosition error:", error);

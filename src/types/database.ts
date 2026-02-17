@@ -128,6 +128,7 @@ export interface LessonProgress {
   lesson_id: string;
   status: ProgressStatus;
   video_position_seconds: number;
+  max_watched_seconds: number;
   started_at: string | null;
   completed_at: string | null;
   updated_at: string;

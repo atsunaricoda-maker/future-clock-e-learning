@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Progress } from "@/components/ui/progress";
 import { VideoPlayer } from "@/components/learning/video-player";
 import { QuizView } from "@/components/learning/quiz-view";
 import { LessonNavigation } from "@/components/learning/lesson-navigation";
-import { markLessonComplete } from "@/lib/actions/enrollment";
+import { markLessonComplete, updateVideoPosition } from "@/lib/actions/enrollment";
+import { isSupabaseVideoUrl, isDirectVideoUrl } from "@/lib/video-utils";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -22,6 +23,9 @@ import {
 import type { Course, Section, Lesson, LessonProgress, Quiz, Question, QuizAttempt } from "@/types/database";
 
 type SectionWithLessons = Section & { lessons: Lesson[] };
+
+/** 視聴完了に必要な最低視聴率（%） */
+const REQUIRED_WATCH_PERCENT = 80;
 
 interface LearningViewProps {
   course: Course;
@@ -38,6 +42,14 @@ interface LearningViewProps {
   quiz?: Quiz | null;
   quizQuestions?: Question[];
   quizAttempts?: QuizAttempt[];
+}
+
+/**
+ * 直接再生可能な動画URL（Supabase Storage等）かどうか判定
+ */
+function isDirectVideo(url: string | null): boolean {
+  if (!url) return false;
+  return isSupabaseVideoUrl(url) || isDirectVideoUrl(url);
 }
 
 export function LearningView({
@@ -62,6 +74,42 @@ export function LearningView({
 
   const isCompleted = progressMap[currentLesson.id]?.status === "completed";
 
+  // 視聴率追跡（Supabase/直接動画のみ有効）
+  const [watchedPercent, setWatchedPercent] = useState(() => {
+    // 既に完了済みなら100%
+    if (isCompleted) return 100;
+    // 前回のmax_watched_secondsから計算
+    const progress = progressMap[currentLesson.id];
+    if (progress?.max_watched_seconds && currentLesson.duration_seconds) {
+      return Math.round(
+        (progress.max_watched_seconds / currentLesson.duration_seconds) * 100
+      );
+    }
+    return 0;
+  });
+
+  // 動画が直接再生タイプか（シーク制限対象か）
+  const isDirectVideoLesson =
+    currentLesson.type === "video" && isDirectVideo(currentLesson.content_url);
+
+  // 完了ボタンが押せる条件
+  const canComplete =
+    isCompleted ||
+    !isDirectVideoLesson || // 直接動画以外（YouTube/Vimeo/document）は常に有効
+    watchedPercent >= REQUIRED_WATCH_PERCENT;
+
+  // 視聴位置のサーバー保存コールバック
+  const handlePositionChange = useCallback(
+    (currentSeconds: number, maxWatchedSeconds: number) => {
+      updateVideoPosition(
+        currentLesson.id,
+        Math.round(currentSeconds),
+        Math.round(maxWatchedSeconds)
+      );
+    },
+    [currentLesson.id]
+  );
+
   const handleMarkComplete = async () => {
     setLoading(true);
     const result = await markLessonComplete(currentLesson.id, course.slug);
@@ -77,6 +125,11 @@ export function LearningView({
     }
     setLoading(false);
   };
+
+  // 前回の再生位置・最大視聴位置を取得
+  const currentProgress = progressMap[currentLesson.id];
+  const initialPosition = currentProgress?.video_position_seconds ?? 0;
+  const initialMaxWatched = currentProgress?.max_watched_seconds ?? 0;
 
   return (
     <div className="flex h-screen flex-col">
@@ -129,6 +182,11 @@ export function LearningView({
               <VideoPlayer
                 url={currentLesson.content_url}
                 title={currentLesson.title}
+                restrictSeek={isDirectVideoLesson}
+                onProgressUpdate={setWatchedPercent}
+                onPositionChange={handlePositionChange}
+                initialPosition={initialPosition}
+                initialMaxWatched={initialMaxWatched}
               />
             )}
 
@@ -192,7 +250,7 @@ export function LearningView({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-col items-center gap-1 shrink-0">
                 {currentLesson.type === "quiz" ? (
                   isCompleted ? (
                     <Button variant="outline" disabled>
@@ -201,13 +259,23 @@ export function LearningView({
                     </Button>
                   ) : null
                 ) : !isCompleted ? (
-                  <Button
-                    onClick={handleMarkComplete}
-                    disabled={loading}
-                  >
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    {loading ? "処理中..." : "完了にする"}
-                  </Button>
+                  <>
+                    <Button
+                      onClick={handleMarkComplete}
+                      disabled={loading || !canComplete}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {loading ? "処理中..." : "完了にする"}
+                    </Button>
+                    {/* 視聴率が足りない場合のメッセージ */}
+                    {isDirectVideoLesson &&
+                      watchedPercent < REQUIRED_WATCH_PERCENT && (
+                        <p className="text-xs text-muted-foreground">
+                          動画を{REQUIRED_WATCH_PERCENT}%以上視聴してください
+                          （現在: {watchedPercent}%）
+                        </p>
+                      )}
+                  </>
                 ) : (
                   <Button variant="outline" disabled>
                     <CheckCircle2 className="mr-2 h-4 w-4 text-green-600" />
