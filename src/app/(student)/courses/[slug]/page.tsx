@@ -32,7 +32,9 @@ export default async function CourseDetailPage({
   searchParams: Promise<{ payment?: string }>;
 }) {
   const { slug } = await params;
-  const { payment } = await searchParams;
+  const { payment: rawPayment } = await searchParams;
+  const payment =
+    rawPayment === "success" || rawPayment === "cancel" ? rawPayment : null;
   const supabase = await createClient();
 
   const { data: course } = await supabase

@@ -38,3 +38,8 @@ CREATE POLICY "Users can view own purchases"
 CREATE POLICY "Service role can manage purchases"
   ON purchases FOR ALL
   USING (auth.role() = 'service_role');
+
+-- 銀行振込のpending重複防止（NULLのstripe_session_idでUNIQUE効かないため）
+CREATE UNIQUE INDEX purchases_bank_transfer_pending_unique
+  ON purchases (user_id, course_id)
+  WHERE payment_method = 'bank_transfer' AND status = 'pending';

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   Table,
   TableBody,
@@ -41,7 +41,7 @@ export default async function AdminPurchasesPage({
   const params = await searchParams;
   const { status, page } = params;
   const currentPage = Math.max(1, Number(page) || 1);
-  const supabase = await createClient();
+  const supabase = createAdminClient();
 
   let query = supabase
     .from("purchases")

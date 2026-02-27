@@ -3,77 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getStripe } from "@/lib/stripe";
 import { createNotification } from "@/lib/actions/notification";
 import { sendEnrollmentEmail } from "@/lib/actions/email";
 import type { PurchaseStatus } from "@/types/database";
 
-export async function createCheckoutSession(courseId: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "認証が必要です" };
-
-  const { data: course } = await supabase
-    .from("courses")
-    .select("id, title, slug, price")
-    .eq("id", courseId)
-    .single();
-
-  if (!course) return { error: "コースが見つかりません" };
-  if (!course.price || course.price <= 0)
-    return { error: "このコースは無料です" };
-
-  // 既に購入済みか確認
-  const { data: existingPurchase } = await supabase
-    .from("purchases")
-    .select("id, status")
-    .eq("user_id", user.id)
-    .eq("course_id", courseId)
-    .eq("status", "completed")
-    .maybeSingle();
-
-  if (existingPurchase) return { error: "すでに購入済みです" };
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3001";
-
-  const session = await getStripe().checkout.sessions.create({
-    payment_method_types: ["card"],
-    line_items: [
-      {
-        price_data: {
-          currency: "jpy",
-          product_data: {
-            name: course.title,
-          },
-          unit_amount: course.price,
-        },
-        quantity: 1,
-      },
-    ],
-    mode: "payment",
-    success_url: `${appUrl}/courses/${course.slug}?payment=success`,
-    cancel_url: `${appUrl}/courses/${course.slug}?payment=cancel`,
-    metadata: {
-      courseId: course.id,
-      userId: user.id,
-    },
-  });
-
-  // purchases レコード作成（pending）
-  const adminClient = createAdminClient();
-  await adminClient.from("purchases").insert({
-    user_id: user.id,
-    course_id: courseId,
-    amount: course.price,
-    status: "pending" as PurchaseStatus,
-    payment_method: "stripe",
-    stripe_session_id: session.id,
-  });
-
-  return { url: session.url };
-}
+// NOTE: Stripe Checkout Session creation is handled by the API route
+// at /api/stripe/checkout (not as a Server Action) to avoid duplication.
 
 export async function createBankTransferPurchase(courseId: string) {
   const supabase = await createClient();
@@ -115,6 +50,9 @@ export async function createBankTransferPurchase(courseId: string) {
   });
 
   if (error) {
+    if (error.code === "23505") {
+      return { error: "振込確認待ちの申し込みがすでにあります" };
+    }
     console.error("createBankTransferPurchase error:", error);
     return { error: "申し込みに失敗しました" };
   }
@@ -161,22 +99,25 @@ export async function confirmBankTransferPurchase(purchaseId: string) {
   if (purchase.status !== "pending")
     return { error: "この購入は確認待ちではありません" };
 
-  // ステータス更新
-  const { error: updateError } = await adminClient
+  // アトミックなステータス遷移（pending → completed のみ成功）
+  const { data: updated, error: updateError } = await adminClient
     .from("purchases")
     .update({ status: "completed", updated_at: new Date().toISOString() })
-    .eq("id", purchaseId);
+    .eq("id", purchaseId)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
 
-  if (updateError) {
+  if (updateError || !updated) {
     console.error("confirmBankTransferPurchase error:", updateError);
-    return { error: "確認処理に失敗しました" };
+    return { error: "すでに処理済みか、確認処理に失敗しました" };
   }
 
-  // enrollment 自動作成
-  await adminClient.from("enrollments").insert({
-    user_id: purchase.user_id,
-    course_id: purchase.course_id,
-  });
+  // enrollment 自動作成（重複時は無視）
+  await adminClient.from("enrollments").upsert(
+    { user_id: purchase.user_id, course_id: purchase.course_id },
+    { onConflict: "user_id,course_id" }
+  );
 
   const courseData = purchase.courses as unknown as {
     title: string;
@@ -204,7 +145,9 @@ export async function confirmBankTransferPurchase(purchaseId: string) {
       to: profile.email,
       userName: profile.full_name ?? "受講生",
       courseTitle: courseData?.title ?? "コース",
-    });
+    }).catch((err: unknown) =>
+      console.error("Failed to send enrollment email:", err)
+    );
   }
 
   revalidatePath("/admin/purchases");

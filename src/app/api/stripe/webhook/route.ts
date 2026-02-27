@@ -14,13 +14,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("STRIPE_WEBHOOK_SECRET is not configured");
+    return NextResponse.json(
+      { error: "Server misconfiguration" },
+      { status: 500 }
+    );
+  }
+
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    );
+    event = getStripe().webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
     return NextResponse.json(
@@ -40,8 +45,8 @@ export async function POST(request: Request) {
 
     const adminClient = createAdminClient();
 
-    // purchases を completed に更新
-    await adminClient
+    // purchases を completed に更新（アトミック: pending → completed のみ成功）
+    const { data: updatedPurchase, error: updateError } = await adminClient
       .from("purchases")
       .update({
         status: "completed",
@@ -51,7 +56,19 @@ export async function POST(request: Request) {
             : null,
         updated_at: new Date().toISOString(),
       })
-      .eq("stripe_session_id", session.id);
+      .eq("stripe_session_id", session.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
+    if (updateError || !updatedPurchase) {
+      console.error(
+        "Failed to update purchase for session:",
+        session.id,
+        updateError
+      );
+      return NextResponse.json({ received: true });
+    }
 
     // enrollment 自動作成（重複時は無視）
     await adminClient
