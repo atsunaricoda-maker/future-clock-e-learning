@@ -61,6 +61,7 @@ export async function createCourse(values: CourseFormValues) {
       difficulty_level: values.difficulty_level || null,
       category: values.category || null,
       tags: tags.length > 0 ? tags : null,
+      price: values.price ?? 0,
       created_by: user.id,
     })
     .select()
@@ -102,6 +103,7 @@ export async function updateCourse(courseId: string, values: CourseFormValues) {
       difficulty_level: values.difficulty_level || null,
       category: values.category || null,
       tags: tags.length > 0 ? tags : null,
+      price: values.price ?? 0,
     })
     .eq("id", courseId)
     .select()

@@ -16,6 +16,7 @@ export const courseFormSchema = z.object({
   difficulty_level: z.string(),
   category: z.string(),
   tags: z.string(), // comma-separated, parsed on server
+  price: z.number().int().nonnegative(),
 });
 
 export type CourseFormValues = z.infer<typeof courseFormSchema>;

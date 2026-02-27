@@ -57,6 +57,7 @@ export function CourseForm({ initialData, categories = [] }: CourseFormProps) {
       difficulty_level: initialData?.difficulty_level ?? "",
       category: initialData?.category ?? "",
       tags: initialData?.tags?.join(", ") ?? "",
+      price: initialData?.price ?? 0,
     },
   });
 
@@ -267,6 +268,31 @@ export function CourseForm({ initialData, categories = [] }: CourseFormProps) {
                         ref={field.ref}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>受講価格（円）</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="0"
+                        value={field.value ?? 0}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          field.onChange(val === "" ? 0 : Number(val));
+                        }}
+                        onBlur={field.onBlur}
+                        name={field.name}
+                        ref={field.ref}
+                      />
+                    </FormControl>
+                    <FormDescription>0 = 無料</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -6,8 +6,9 @@ import { CourseCurriculum } from "@/components/courses/course-curriculum";
 import { CourseReviews } from "@/components/courses/course-reviews";
 import { EnrollButton } from "@/components/courses/enroll-button";
 import { checkPrerequisites } from "@/lib/actions/prerequisite";
+import { PaymentResultToast } from "@/components/courses/payment-result-toast";
 import { Clock, BarChart3, BookOpen, Tag, Users } from "lucide-react";
-import type { Section, Lesson } from "@/types/database";
+import type { Section, Lesson, PurchaseStatus } from "@/types/database";
 
 type SectionWithLessons = Section & { lessons: Lesson[] };
 
@@ -25,10 +26,13 @@ const difficultyColor: Record<string, string> = {
 
 export default async function CourseDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ payment?: string }>;
 }) {
   const { slug } = await params;
+  const { payment } = await searchParams;
   const supabase = await createClient();
 
   const { data: course } = await supabase
@@ -69,6 +73,21 @@ export default async function CourseDetailPage({
       .eq("course_id", course.id)
       .single();
     isEnrolled = !!enrollment;
+  }
+
+  // Check purchase status for paid courses
+  let purchaseStatus: PurchaseStatus | null = null;
+  if (user && !isEnrolled && course.price > 0) {
+    const { data: purchaseData } = await supabase
+      .from("purchases")
+      .select("status")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .in("status", ["completed", "pending"])
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    purchaseStatus = (purchaseData?.status as PurchaseStatus) ?? null;
   }
 
   // Check prerequisites for non-enrolled logged-in users
@@ -226,6 +245,19 @@ export default async function CourseDetailPage({
                 </div>
               )}
 
+              {/* Price display */}
+              {!isEnrolled && (
+                <div className="text-center">
+                  {course.price > 0 ? (
+                    <p className="text-2xl font-bold">
+                      ¥{course.price.toLocaleString()}
+                    </p>
+                  ) : (
+                    <p className="text-2xl font-bold text-green-600">無料</p>
+                  )}
+                </div>
+              )}
+
               <EnrollButton
                 courseId={course.id}
                 courseSlug={course.slug}
@@ -233,6 +265,8 @@ export default async function CourseDetailPage({
                 isLoggedIn={!!user}
                 firstLessonId={firstLessonId}
                 unmetPrerequisites={unmetPrerequisites}
+                price={course.price ?? 0}
+                purchaseStatus={purchaseStatus}
               />
 
               <div className="grid grid-cols-2 gap-3 pt-2 text-center text-sm">
@@ -289,6 +323,9 @@ export default async function CourseDetailPage({
         userReview={userReview}
         isEnrolled={isEnrolled}
       />
+
+      {/* Payment result toast */}
+      {payment && <PaymentResultToast result={payment} />}
     </div>
   );
 }

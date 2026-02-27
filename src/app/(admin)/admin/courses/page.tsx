@@ -90,6 +90,7 @@ export default async function AdminCoursesPage({
                   <TableHead className="w-[300px]">タイトル</TableHead>
                   <TableHead>ステータス</TableHead>
                   <TableHead>カテゴリ</TableHead>
+                  <TableHead>価格</TableHead>
                   <TableHead>公開</TableHead>
                   <TableHead>作成日</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
@@ -116,6 +117,11 @@ export default async function AdminCoursesPage({
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {course.category || "-"}
+                    </TableCell>
+                    <TableCell>
+                      {course.price > 0
+                        ? `¥${course.price.toLocaleString()}`
+                        : "無料"}
                     </TableCell>
                     <TableCell>
                       {course.is_public ? "公開" : "限定"}

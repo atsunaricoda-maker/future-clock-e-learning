@@ -51,7 +51,25 @@ export interface Course {
   difficulty_level: string | null;
   category: string | null;
   tags: string[] | null;
+  price: number;
   created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PurchaseStatus = "pending" | "completed" | "failed" | "refunded";
+export type PaymentMethod = "stripe" | "bank_transfer";
+
+export interface Purchase {
+  id: string;
+  user_id: string;
+  course_id: string;
+  amount: number;
+  status: PurchaseStatus;
+  payment_method: PaymentMethod;
+  stripe_session_id: string | null;
+  stripe_payment_intent_id: string | null;
+  admin_note: string | null;
   created_at: string;
   updated_at: string;
 }

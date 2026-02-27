@@ -14,6 +14,7 @@ import {
   Tag,
   Megaphone,
   Route,
+  CreditCard,
 } from "lucide-react";
 
 export const adminNavigation = [
@@ -52,6 +53,11 @@ export const adminNavigation = [
     name: "学習パス管理",
     href: "/admin/learning-paths",
     icon: Route,
+  },
+  {
+    name: "購入管理",
+    href: "/admin/purchases",
+    icon: CreditCard,
   },
   {
     name: "学習ログ",

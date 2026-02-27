@@ -14,6 +14,38 @@ export async function enrollInCourse(courseId: string) {
   } = await supabase.auth.getUser();
   if (!user) return { error: "認証が必要です" };
 
+  // 有料コースの場合は直接登録不可（購入フロー必須）
+  const { data: courseData } = await supabase
+    .from("courses")
+    .select("price")
+    .eq("id", courseId)
+    .single();
+
+  if (courseData && courseData.price > 0) {
+    // 企業割当のコースかチェック
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("company_id")
+      .eq("id", user.id)
+      .single();
+
+    if (userProfile?.company_id) {
+      const { data: companyCourse } = await supabase
+        .from("company_courses")
+        .select("id")
+        .eq("company_id", userProfile.company_id)
+        .eq("course_id", courseId)
+        .maybeSingle();
+
+      // 企業割当がない場合は購入が必要
+      if (!companyCourse) {
+        return { error: "購入手続きが必要です" };
+      }
+    } else {
+      return { error: "購入手続きが必要です" };
+    }
+  }
+
   // Check prerequisites before enrollment
   const prereqCheck = await checkPrerequisites(user.id, courseId);
   if (!prereqCheck.met) {

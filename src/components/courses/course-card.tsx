@@ -64,6 +64,11 @@ export function CourseCard({ course }: CourseCardProps) {
         </CardContent>
 
         <CardFooter className="flex items-center gap-3 border-t px-4 py-3 text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">
+            {course.price > 0
+              ? `¥${course.price.toLocaleString()}`
+              : "無料"}
+          </span>
           {course.estimated_duration_min && (
             <span className="flex items-center gap-1">
               <Clock className="h-3.5 w-3.5" />

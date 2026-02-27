@@ -35,6 +35,11 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Stripe webhook はauth不要（署名検証で保護）
+  if (pathname.startsWith("/api/stripe/webhook")) {
+    return supabaseResponse;
+  }
+
   // Redirect unauthenticated users to login
   if (
     !user &&
