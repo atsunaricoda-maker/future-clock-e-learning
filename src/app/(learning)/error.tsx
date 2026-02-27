@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
-export default function Error({
+export default function LearningError({
   error,
   reset,
 }: {
@@ -16,28 +17,25 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-4">
-      <div className="text-center">
-        <h1 className="text-6xl font-bold text-muted-foreground">500</h1>
-        <h2 className="mt-4 text-2xl font-semibold">
-          エラーが発生しました
-        </h2>
+    <div className="flex h-screen flex-col items-center justify-center px-4 bg-background">
+      <div className="text-center max-w-md">
+        <h2 className="text-2xl font-semibold">エラーが発生しました</h2>
         <p className="mt-2 text-muted-foreground">
-          申し訳ございません。予期しないエラーが発生しました。
+          学習画面でエラーが発生しました。再試行するか、ダッシュボードに戻ってください。
         </p>
-        <div className="mt-8 flex items-center justify-center gap-4">
+        <div className="mt-6 flex items-center justify-center gap-4">
           <button
             onClick={() => reset()}
             className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-6 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
             再試行
           </button>
-          <a
+          <Link
             href="/dashboard"
             className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-6 text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             ダッシュボードへ
-          </a>
+          </Link>
         </div>
       </div>
     </div>
