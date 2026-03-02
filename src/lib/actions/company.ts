@@ -2,9 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { companyFormSchema } from "@/lib/validations/company";
 import type { CompanyFormValues } from "@/lib/validations/company";
 
 export async function createCompany(values: CompanyFormValues) {
+  // サーバーサイド バリデーション
+  const parsed = companyFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -36,6 +44,13 @@ export async function createCompany(values: CompanyFormValues) {
 }
 
 export async function updateCompany(companyId: string, values: CompanyFormValues) {
+  // サーバーサイド バリデーション
+  const parsed = companyFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },

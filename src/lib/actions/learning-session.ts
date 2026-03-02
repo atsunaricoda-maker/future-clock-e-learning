@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { sanitizeFilterInput } from "@/lib/sanitize";
 
 type LogoutReason = "manual" | "browser_close" | "inactivity" | "session_expired";
 
@@ -260,8 +261,9 @@ export async function getLearningSessionsForAdmin(filters: {
       userQuery = userQuery.eq("company_id", companyId);
     }
     if (filters.userName) {
+      const sanitized = sanitizeFilterInput(filters.userName);
       userQuery = userQuery.or(
-        `full_name.ilike.%${filters.userName}%,email.ilike.%${filters.userName}%`
+        `full_name.ilike.%${sanitized}%,email.ilike.%${sanitized}%`
       );
     }
     const { data: filteredUsers } = await userQuery;

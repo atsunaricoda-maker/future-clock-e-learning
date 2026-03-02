@@ -1,10 +1,41 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { rateLimit, getClientIp, RATE_LIMITS } from "@/lib/rate-limit";
+
+/**
+ * next パラメータの安全性チェック（オープンリダイレクト防止）
+ * 相対パスのみ許可し、外部URLやプロトコル相対URLを拒否する
+ */
+function sanitizeRedirectPath(next: string | null): string | null {
+  if (!next) return null;
+  // 相対パス（/で始まる）のみ許可。// や http:// 等は拒否
+  if (!next.startsWith("/") || next.startsWith("//")) return null;
+  // バックスラッシュも拒否（ブラウザによっては //と解釈される）
+  if (next.includes("\\")) return null;
+  // URL-encoded文字でのバイパスを防ぐため、デコードしてもチェック
+  try {
+    const decoded = decodeURIComponent(next);
+    if (!decoded.startsWith("/") || decoded.startsWith("//") || decoded.includes("\\")) {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  return next;
+}
 
 export async function GET(request: Request) {
+  // Rate Limit チェック
+  const ip = getClientIp(request);
+  const rl = rateLimit(`auth-callback:${ip}`, RATE_LIMITS.auth);
+  if (!rl.success) {
+    const { origin } = new URL(request.url);
+    return NextResponse.redirect(`${origin}/login?error=rate_limit`);
+  }
+
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next");
+  const next = sanitizeRedirectPath(searchParams.get("next"));
 
   if (code) {
     const supabase = await createClient();

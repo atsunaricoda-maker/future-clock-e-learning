@@ -18,6 +18,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Users, Plus } from "lucide-react";
 import type { UserRole } from "@/types/database";
+import { sanitizeFilterInput } from "@/lib/sanitize";
 
 const PER_PAGE = 20;
 
@@ -41,7 +42,8 @@ export default async function AdminUsersPage({
     .order("created_at", { ascending: false });
 
   if (q) {
-    query = query.or(`display_name.ilike.%${q}%,email.ilike.%${q}%`);
+    const sq = sanitizeFilterInput(q);
+    query = query.or(`display_name.ilike.%${sq}%,email.ilike.%${sq}%`);
   }
   if (role) {
     query = query.eq("role", role);

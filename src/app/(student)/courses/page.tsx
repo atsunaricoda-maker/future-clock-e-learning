@@ -6,6 +6,7 @@ import { PaginationControls } from "@/components/ui/pagination-controls";
 import { getActiveCategories } from "@/lib/actions/category";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen } from "lucide-react";
+import { sanitizeFilterInput } from "@/lib/sanitize";
 
 interface SearchParams {
   q?: string;
@@ -36,7 +37,8 @@ export default async function CourseCatalogPage({
     .order("created_at", { ascending: false });
 
   if (q) {
-    query = query.or(`title.ilike.%${q}%,short_description.ilike.%${q}%`);
+    const sq = sanitizeFilterInput(q);
+    query = query.or(`title.ilike.%${sq}%,short_description.ilike.%${sq}%`);
   }
   if (category) {
     query = query.eq("category", category);

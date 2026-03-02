@@ -16,6 +16,7 @@ import { CompanyActions } from "@/components/admin/company-actions";
 import { AdminCompanyFilters } from "@/components/admin/admin-company-filters";
 import { PaginationControls } from "@/components/ui/pagination-controls";
 import { Plus, Building2 } from "lucide-react";
+import { sanitizeFilterInput } from "@/lib/sanitize";
 
 const PER_PAGE = 20;
 
@@ -35,7 +36,8 @@ export default async function AdminCompaniesPage({
     .order("created_at", { ascending: false });
 
   if (q) {
-    query = query.or(`name.ilike.%${q}%,slug.ilike.%${q}%`);
+    const sq = sanitizeFilterInput(q);
+    query = query.or(`name.ilike.%${sq}%,slug.ilike.%${sq}%`);
   }
   if (status === "active") {
     query = query.eq("is_active", true);

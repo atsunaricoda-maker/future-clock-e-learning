@@ -2,10 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { profileFormSchema, passwordChangeSchema } from "@/lib/validations/profile";
 import type { ProfileFormValues, PasswordChangeValues } from "@/lib/validations/profile";
 import type { NotificationPreferences } from "@/types/database";
 
 export async function updateProfile(values: ProfileFormValues) {
+  // サーバーサイド バリデーション
+  const parsed = profileFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -33,6 +41,13 @@ export async function updateProfile(values: ProfileFormValues) {
 export async function changePassword(
   values: PasswordChangeValues
 ): Promise<{ error?: string; success?: boolean }> {
+  // サーバーサイド バリデーション
+  const parsed = passwordChangeSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },

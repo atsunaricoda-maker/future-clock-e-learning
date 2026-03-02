@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { markLessonComplete } from "@/lib/actions/enrollment";
 import { createNotification } from "@/lib/actions/notification";
+import { quizFormSchema, questionFormSchema } from "@/lib/validations/quiz";
 import type { QuizFormValues, QuestionFormValues } from "@/lib/validations/quiz";
 
 // ============================================
@@ -60,6 +61,12 @@ export async function updateQuiz(
   courseId: string,
   values: QuizFormValues
 ) {
+  const parsed = quizFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -115,6 +122,12 @@ export async function createQuestion(
   courseId: string,
   values: QuestionFormValues
 ) {
+  const parsed = questionFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -161,6 +174,12 @@ export async function updateQuestion(
   courseId: string,
   values: QuestionFormValues
 ) {
+  const parsed = questionFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },

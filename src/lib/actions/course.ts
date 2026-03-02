@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { generateSlug } from "@/lib/slug";
+import { courseFormSchema, sectionFormSchema, lessonFormSchema } from "@/lib/validations/course";
 import type { CourseFormValues, SectionFormValues, LessonFormValues } from "@/lib/validations/course";
 
 // Supabase Storage の動画URLからストレージパスを抽出
@@ -33,6 +34,13 @@ async function removeVideoFromStorage(contentUrl: string) {
 // ============================================
 
 export async function createCourse(values: CourseFormValues) {
+  // サーバーサイド バリデーション
+  const parsed = courseFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -77,6 +85,13 @@ export async function createCourse(values: CourseFormValues) {
 }
 
 export async function updateCourse(courseId: string, values: CourseFormValues) {
+  // サーバーサイド バリデーション
+  const parsed = courseFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -167,6 +182,12 @@ export async function updateCourseStatus(
 // ============================================
 
 export async function createSection(courseId: string, values: SectionFormValues) {
+  const parsed = sectionFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -204,6 +225,12 @@ export async function createSection(courseId: string, values: SectionFormValues)
 }
 
 export async function updateSection(sectionId: string, courseId: string, values: SectionFormValues) {
+  const parsed = sectionFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -258,6 +285,12 @@ export async function reorderSections(courseId: string, orderedIds: string[]) {
 // ============================================
 
 export async function createLesson(sectionId: string, courseId: string, values: LessonFormValues) {
+  const parsed = lessonFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -299,6 +332,12 @@ export async function createLesson(sectionId: string, courseId: string, values: 
 }
 
 export async function updateLesson(lessonId: string, courseId: string, values: LessonFormValues) {
+  const parsed = lessonFormSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
 
   // 旧レッスンのcontent_urlを取得（ストレージクリーンアップ用）

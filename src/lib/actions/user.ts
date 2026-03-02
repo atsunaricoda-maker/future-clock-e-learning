@@ -4,11 +4,19 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { UserRole } from "@/types/database";
+import { createUserSchema } from "@/lib/validations/user";
 import type { CreateUserFormValues } from "@/lib/validations/user";
 
 export async function createUser(
   values: CreateUserFormValues
 ): Promise<{ error?: string; data?: { id: string } }> {
+  // サーバーサイド バリデーション
+  const parsed = createUserSchema.safeParse(values);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "入力値が不正です" };
+  }
+  values = parsed.data;
+
   const supabase = await createClient();
   const {
     data: { user },
