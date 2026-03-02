@@ -17,7 +17,11 @@ export async function POST(request: Request) {
     const contentType = request.headers.get("content-type") ?? "";
 
     if (contentType.includes("application/json")) {
-      body = await request.json();
+      const text = await request.text();
+      if (!text) {
+        return NextResponse.json({ error: "Empty body" }, { status: 400 });
+      }
+      body = JSON.parse(text);
     } else {
       // text/plain (sendBeacon fallback)
       const text = await request.text();

@@ -4,7 +4,15 @@ import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import type { NotificationPreferences } from "@/types/database";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) throw new Error("RESEND_API_KEY is not configured");
+    _resend = new Resend(key);
+  }
+  return _resend;
+}
 
 const FROM_EMAIL = process.env.RESEND_FROM_EMAIL ?? "noreply@futureclock.jp";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3001";
@@ -46,7 +54,7 @@ export async function sendEnrollmentEmail({
       if (!prefs.email_enrollment) return;
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `FutureClock LMS <${FROM_EMAIL}>`,
       to,
       subject: `【FutureClock】「${courseTitle}」への受講登録が完了しました`,
@@ -90,7 +98,7 @@ export async function sendCertificateEmail({
       if (!prefs.email_certificate) return;
     }
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `FutureClock LMS <${FROM_EMAIL}>`,
       to,
       subject: `【FutureClock】「${courseTitle}」の修了証が発行されました`,
@@ -129,7 +137,7 @@ export async function sendInvitationEmail({
   try {
     const inviteUrl = `${APP_URL}/invite/${token}`;
 
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `FutureClock LMS <${FROM_EMAIL}>`,
       to,
       subject: `【FutureClock】${companyName}への招待`,
@@ -169,7 +177,7 @@ export async function sendReminderEmail({
   progressPercentage: number;
 }) {
   try {
-    await resend.emails.send({
+    await getResend().emails.send({
       from: `FutureClock LMS <${FROM_EMAIL}>`,
       to,
       subject: `【FutureClock】「${courseTitle}」の学習を続けましょう`,
