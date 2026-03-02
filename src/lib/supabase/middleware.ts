@@ -54,6 +54,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Fetch role once for all protected route checks
+  const needsRoleCheck =
+    user &&
+    (pathname.startsWith("/login") ||
+      pathname.startsWith("/register") ||
+      pathname.startsWith("/forgot-password") ||
+      pathname.startsWith("/admin") ||
+      pathname.startsWith("/company"));
+
+  const role = needsRoleCheck
+    ? (await supabase.from("users").select("role").eq("id", user!.id).single())
+        .data?.role
+    : null;
+
   // Redirect authenticated users away from auth pages
   if (
     user &&
@@ -61,16 +75,10 @@ export async function updateSession(request: NextRequest) {
       pathname.startsWith("/register") ||
       pathname.startsWith("/forgot-password"))
   ) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
     const url = request.nextUrl.clone();
-    if (profile?.role === "admin") {
+    if (role === "admin") {
       url.pathname = "/admin";
-    } else if (profile?.role === "company_admin") {
+    } else if (role === "company_admin") {
       url.pathname = "/company";
     } else {
       url.pathname = "/dashboard";
@@ -78,34 +86,18 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Protect admin routes - check user role
-  if (user && pathname.startsWith("/admin")) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "admin") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
+  // Protect admin routes
+  if (user && pathname.startsWith("/admin") && role !== "admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
   }
 
   // Protect company-admin routes
-  if (user && pathname.startsWith("/company")) {
-    const { data: profile } = await supabase
-      .from("users")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (profile?.role !== "company_admin") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
+  if (user && pathname.startsWith("/company") && role !== "company_admin") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
   }
 
   return supabaseResponse;

@@ -219,33 +219,35 @@ export default async function StudentDashboardPage() {
   const continueLearningItems: ContinueLearningItem[] = [];
   const topInProgress = inProgressEnrollments.slice(0, 3);
   if (topInProgress.length > 0) {
-    const courseQueries = await Promise.all(
-      topInProgress.map((enrollment) => {
-        const course = enrollment.courses as unknown as {
-          id: string;
-          title: string;
-          slug: string;
-        };
-        return supabase
-          .from("sections")
-          .select("id, title, order_index, lessons(id, title, order_index)")
-          .eq("course_id", course.id)
-          .order("order_index", { ascending: true })
-          .order("order_index", {
-            referencedTable: "lessons",
-            ascending: true,
-          });
-      })
-    );
+    const courseIds = topInProgress.map((e) => {
+      const course = e.courses as unknown as { id: string };
+      return course.id;
+    });
 
-    for (let i = 0; i < topInProgress.length; i++) {
-      const enrollment = topInProgress[i];
+    const { data: allSections } = await supabase
+      .from("sections")
+      .select("id, course_id, title, order_index, lessons(id, title, order_index)")
+      .in("course_id", courseIds)
+      .order("order_index", { ascending: true })
+      .order("order_index", {
+        referencedTable: "lessons",
+        ascending: true,
+      });
+
+    const sectionsByCourse = new Map<string, typeof allSections>();
+    for (const section of allSections ?? []) {
+      const existing = sectionsByCourse.get(section.course_id) ?? [];
+      existing.push(section);
+      sectionsByCourse.set(section.course_id, existing);
+    }
+
+    for (const enrollment of topInProgress) {
       const course = enrollment.courses as unknown as {
         id: string;
         title: string;
         slug: string;
       };
-      const sections = courseQueries[i].data ?? [];
+      const sections = sectionsByCourse.get(course.id) ?? [];
 
       let nextLessonId: string | null = null;
       let nextLessonTitle: string | null = null;
