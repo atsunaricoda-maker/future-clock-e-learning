@@ -170,6 +170,17 @@ export interface Certificate {
   certificate_number: string;
   pdf_url: string | null;
   issued_at: string;
+  training_start_date: string | null;
+  training_end_date: string | null;
+  total_learning_minutes: number | null;
+}
+
+export interface SiteSetting {
+  id: string;
+  key: string;
+  value: string;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export interface Notification {

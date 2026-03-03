@@ -39,12 +39,36 @@ export async function issueCertificate(userId: string, courseId: string) {
 
   const certificateNumber = generateCertificateNumber();
 
+  // 受講期間を取得
+  const { data: enrollment } = await supabase
+    .from("enrollments")
+    .select("enrolled_at, completed_at")
+    .eq("user_id", userId)
+    .eq("course_id", courseId)
+    .single();
+
+  // 総受講時間を算出（コース全レッスンの duration_seconds 合計）
+  const { data: lessonDurations } = await supabase
+    .from("lessons")
+    .select("duration_seconds, sections!inner(course_id)")
+    .eq("sections.course_id", courseId);
+
+  const totalSeconds = (lessonDurations ?? []).reduce(
+    (sum: number, l: { duration_seconds: number | null }) =>
+      sum + (l.duration_seconds ?? 0),
+    0
+  );
+  const totalLearningMinutes = Math.round(totalSeconds / 60);
+
   const { data, error } = await supabase
     .from("certificates")
     .insert({
       user_id: userId,
       course_id: courseId,
       certificate_number: certificateNumber,
+      training_start_date: enrollment?.enrolled_at ?? null,
+      training_end_date: enrollment?.completed_at ?? new Date().toISOString(),
+      total_learning_minutes: totalLearningMinutes || null,
     })
     .select()
     .single();

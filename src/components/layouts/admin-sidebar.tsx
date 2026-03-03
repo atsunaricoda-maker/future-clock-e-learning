@@ -15,6 +15,7 @@ import {
   Megaphone,
   Route,
   CreditCard,
+  Settings,
 } from "lucide-react";
 
 export const adminNavigation = [
@@ -73,6 +74,11 @@ export const adminNavigation = [
     name: "分析",
     href: "/admin/analytics",
     icon: BarChart3,
+  },
+  {
+    name: "設定",
+    href: "/admin/settings",
+    icon: Settings,
   },
 ];
 

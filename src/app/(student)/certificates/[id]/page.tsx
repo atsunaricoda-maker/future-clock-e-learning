@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { CertificateView } from "@/components/certificates/certificate-view";
+import { CertificateDetailWrapper } from "@/components/certificates/certificate-detail-wrapper";
+import { getOrganizationInfo } from "@/lib/actions/site-settings";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 
@@ -18,12 +19,15 @@ export default async function CertificateDetailPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: certificate } = await supabase
-    .from("certificates")
-    .select("*, courses(title), users(full_name)")
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single();
+  const [{ data: certificate }, orgInfo] = await Promise.all([
+    supabase
+      .from("certificates")
+      .select("*, courses(title), users(full_name)")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single(),
+    getOrganizationInfo(),
+  ]);
 
   if (!certificate) notFound();
 
@@ -48,11 +52,17 @@ export default async function CertificateDetailPage({
         </div>
       </div>
 
-      <CertificateView
+      <CertificateDetailWrapper
         userName={certUser?.full_name ?? "受講生"}
         courseTitle={course?.title ?? "不明なコース"}
         certificateNumber={certificate.certificate_number}
         issuedAt={certificate.issued_at}
+        trainingStartDate={certificate.training_start_date}
+        trainingEndDate={certificate.training_end_date}
+        totalLearningMinutes={certificate.total_learning_minutes}
+        organizationName={orgInfo.organization_name}
+        representativeName={orgInfo.representative_name}
+        organizationAddress={orgInfo.organization_address}
       />
     </div>
   );
